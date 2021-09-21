@@ -1,5 +1,5 @@
-import TravelEntity from 'src/entities/travel.entity'
-import { NotifierInterface } from 'src/notify/interface'
+import TravelEntity from '../entities/travel.entity'
+import { NotifierInterface } from '../notify/interface'
 import TrainlineBooker from './trainline'
 import OuiSNCFBooker from './ouisncf'
 

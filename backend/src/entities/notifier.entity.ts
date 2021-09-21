@@ -1,5 +1,5 @@
-import { NotifierInterface } from "src/notify/interface"
-import { Entity, PrimaryGeneratedColumn, Column, BaseEntity, CreateDateColumn, OneToMany } from "typeorm"
+import { NotifierInterface } from '../notify/interface'
+import { Entity, PrimaryGeneratedColumn, Column, BaseEntity, CreateDateColumn, OneToMany } from 'typeorm'
 import SmsNotifier from '../notify/sms'
 import TravelEntity from './travel.entity'
 
