@@ -1,3 +1,4 @@
+import { NotifierInterface } from "src/notify/interface"
 import { Entity, PrimaryGeneratedColumn, Column, BaseEntity, CreateDateColumn, OneToMany } from "typeorm"
 import SmsNotifier from '../notify/sms'
 import TravelEntity from './travel.entity'
@@ -34,7 +35,7 @@ export default class NotifierEntity extends BaseEntity {
     return Object.assign({}, this, { username: undefined, password: undefined })
   }
 
-  init (): SmsNotifier {
+  init (): NotifierInterface {
     let notifier
     switch (this.type) {
       case Type.sms:

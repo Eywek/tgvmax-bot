@@ -13,6 +13,9 @@
             <span v-if="travel.minHour"><span v-if="!travel.maxHour">></span>{{ travel.minHour }}h</span><span v-if="travel.minHour && travel.maxHour">-</span><span v-if="travel.maxHour"><span v-if="!travel.minHour"><</span>{{ travel.maxHour }}h</span>
           </div>
         </div>
+        <p v-if="travel.book" class="text-gray-700 text-base">
+          Le train sera réservé avec {{ travel.booker.type }} ({{ travel.booker.name }})
+        </p>
         <p class="text-gray-700 text-base">
           Vous serez notifié via {{ travel.notifier.type }} ({{ travel.notifier.name }})
         </p>

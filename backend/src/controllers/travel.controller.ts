@@ -12,12 +12,13 @@ export default class TravelController {
   }
 
   static async list (req: express.Request, res: express.Response) {
-    const travels = await TravelEntity.find({ relations: ['notifier'] })
+    const travels = await TravelEntity.find({ relations: ['notifier', 'booker'] })
     return res.send(travels)
   }
 
   static async create (req: express.Request, res: express.Response) {
     if (!req.body.notifier) return res.status(400).send({ msg: 'You need to provide a notifier.' })
+    if (!req.body.booker) return res.status(400).send({ msg: 'You need to provide a booker.' })
     const travel = await TravelEntity.insertAndCrawl(req.body)
     return res.send(travel)
   }

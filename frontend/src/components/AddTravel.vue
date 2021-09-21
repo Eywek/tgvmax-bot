@@ -59,6 +59,29 @@
       </div>
     </div>
     <div class="mb-4">
+      <label class="block text-gray-700 text-sm font-bold mb-2" for="booker">Booker</label>
+      <select
+        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none"
+        id="booker"
+        type="text"
+        v-model="booker"
+      >
+        <option disabled value="">Select a booker</option>
+        <option v-for="booker in this.$store.state.bookers" v-bind:value="booker.id">
+          {{ booker.name }} ({{ booker.type }})
+        </option>
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="block text-gray-700 text-sm font-bold mb-2" for="book">Reservation automatique</label>
+      <input
+        class="form-checkbox leading-tight focus:outline-none"
+        id="book"
+        type="checkbox"
+        v-model="book"
+      />
+    </div>
+    <div class="mb-4">
       <label class="block text-gray-700 text-sm font-bold mb-2" for="notifier">Notifier</label>
       <select
         class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none"
@@ -103,8 +126,10 @@ export default {
     }
   },
   async mounted() {
-    const res = await fetch(`${process.env.API_URL}/notifiers`)
-    this.$store.state.notifiers = await res.json()
+    const notifiers = await fetch(`${process.env.API_URL}/notifiers`)
+    this.$store.state.notifiers = await notifiers.json()
+    const bookers = await fetch(`${process.env.API_URL}/bookers`)
+    this.$store.state.bookers = await bookers.json()
   },
   methods: {
     formatAutocomplete (results) {
@@ -131,7 +156,9 @@ export default {
           date: new Date(this.date.toDateString() + ' UTC'),
           minHour: this.minHour,
           maxHour: this.maxHour,
-          notifier: this.notifier
+          notifier: this.notifier,
+          booker: this.booker,
+          book: this.book
         })
       })
       this.$store.state.travels.push(await res.json())
