@@ -1,16 +1,14 @@
 import { Entity, PrimaryGeneratedColumn, Column, BaseEntity, JoinColumn, CreateDateColumn, ManyToOne, DeleteResult, InsertResult, SaveOptions } from "typeorm"
-import Crawler from '../utils/crawler'
+import { BookerInterface } from '../book/interface'
 import NotifierEntity from './notifier.entity'
+import BookerEntity from './booker.entity'
 import * as debug from 'debug'
 const logger = debug('entity:travel')
 
-const crawlers = new Map<number, Crawler>()
+const bookers = new Map<number, BookerInterface>()
 
 @Entity({name: "travels"})
 export default class TravelEntity extends BaseEntity {
-
-  private crawler: Crawler
-
   @PrimaryGeneratedColumn()
   id: number
 
@@ -33,27 +31,34 @@ export default class TravelEntity extends BaseEntity {
   @JoinColumn()
   notifier: NotifierEntity
 
+  @Column({ default: false })
+  book: boolean
+
+  @ManyToOne(type => BookerEntity, booker => booker.travels)
+  @JoinColumn()
+  booker: BookerEntity
+
   @CreateDateColumn()
   createdAt: Date
   
-  initCrawler (): void {
-    logger(`Init crawler for ${this.id} (${this.from}-${this.to}_${this.date}) (notifier: '${this.notifier.name}')`)
-    crawlers.set(this.id, new Crawler(this, this.notifier.init()))
+  init (): void {
+    logger(`Init booker for ${this.id} (${this.from}-${this.to}_${this.date}) (notifier: '${this.notifier.name}')`)
+    bookers.set(this.id, this.booker.init(this, this.notifier.init()))
   }
 
   static async insertAndCrawl(...args): Promise<TravelEntity> {
     // @ts-ignore
     const res = await this.insert(...args)
     const id = res.generatedMaps[0].id
-    const travel = await this.findOne({ id }, { relations: ['notifier'] })
-    travel.initCrawler()
+    const travel = await this.findOne({ id }, { relations: ['notifier', 'booker'] })
+    travel.init()
     return travel
   }
 
-  static deleteById(id: string | number): Promise<DeleteResult> {
+  static async deleteById(id: string | number): Promise<DeleteResult> {
     if (typeof id === 'string') id = parseInt(id)
-    crawlers.get(id).destroy()
-    crawlers.delete(id)
+    await bookers.get(id).destroy()
+    bookers.delete(id)
     return this.delete({ id })
   }
 

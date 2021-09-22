@@ -3,10 +3,12 @@
     <div class="flex flex-wrap mb-4">
       <div class="w-full md:w-1/2 p-10">
         <AddTravel/>
+        <AddBooker/>
         <AddNotifier/>
       </div>
       <div class="w-full md:w-1/2 p-10">
         <ListTravels/>
+        <ListBookers/>
         <ListNotifiers/>
       </div>
     </div>
@@ -15,16 +17,20 @@
 
 <script>
 import AddTravel from './components/AddTravel'
+import AddBooker from './components/AddBooker'
 import AddNotifier from './components/AddNotifier'
 import ListTravels from './components/ListTravels'
+import ListBookers from './components/ListBookers'
 import ListNotifiers from './components/ListNotifiers'
 
 export default {
   name: 'App',
   components: {
     AddTravel,
+    AddBooker,
     AddNotifier,
     ListTravels,
+    ListBookers,
     ListNotifiers
   },
   async mounted() {
