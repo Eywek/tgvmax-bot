@@ -1,8 +1,8 @@
-FROM node:alpine
+FROM node:12-alpine
 
 COPY ./ /usr/src
 WORKDIR /usr/src
-ENV NODE_ENV production
+# ENV NODE_ENV production
 RUN yarn
 RUN "yarn" "generate"
 
