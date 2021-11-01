@@ -135,7 +135,7 @@ export default {
     formatAutocomplete (results) {
       return results.filter((result) => {
         return result.category === 'station' && (result.type === 'G' || result.type === 'L')
-      })
+      }).map(r => ({ label: r.label, id: r.rrCode }))
     },
     autocompleteSelected (key) {
       return (value) => {

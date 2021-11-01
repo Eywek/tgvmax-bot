@@ -1,4 +1,4 @@
-FROM node AS builder
+FROM node:12 AS builder
 
 COPY ./ /usr/src
 WORKDIR /usr/src
