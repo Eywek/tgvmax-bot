@@ -23,10 +23,10 @@ export default class OuiSNCFBooker implements BookerInterface {
   constructor (travel: TravelEntity, notifier: NotifierInterface) {
     this.travel = travel
     this.notifier = notifier
-    this.endpoint = `https://www.oui.sncf/calendar/cdp/api/proposals/v3/outward/${this.travel.from}/${this.travel.to}/${this.date}/12-HAPPY_CARD/2/fr/fr?currency=EUR&onlyDirectTrains=false`
+    this.endpoint = `https://www.oui.sncf/calendar/cdp/api/proposals/v3/outward/${this.travel.from}/${this.travel.to}/${this.travel.date}/12-HAPPY_CARD/2/fr/fr?currency=EUR&onlyDirectTrains=false`
     this.interval = setInterval(this.check.bind(this), 1000 * 60 * 30)
     this.interval.unref()
-    this.logger = debug(`booker:ouisncf:${this.travel.from}-${this.travel.to}_${this.date}`)
+    this.logger = debug(`booker:ouisncf:${this.travel.from}-${this.travel.to}_${this.travel.date}`)
     this.logger(`Init booker`)
 
     this.check()
@@ -34,10 +34,6 @@ export default class OuiSNCFBooker implements BookerInterface {
 
   async destroy () {
     clearInterval(this.interval)
-  }
-
-  private get date () {
-    return this.travel.date.toISOString().split('T')[0]
   }
 
   private get from () {
@@ -72,7 +68,7 @@ export default class OuiSNCFBooker implements BookerInterface {
   }
 
   private formatMessage (tickets: Array<Ticket>): string {
-    let content = `Des billets TGVMax sont disponible pour le ${this.date}:`
+    let content = `Des billets TGVMax sont disponible pour le ${this.travel.date}:`
     tickets.forEach((ticket) => {
       content += `\n- ${this.from}-${this.to}: ${getHourFromDate(ticket.departureDate)}-${getHourFromDate(ticket.arrivalDate)}`
     })
