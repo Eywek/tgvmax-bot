@@ -1,6 +1,7 @@
 import NotifierEntity from '../entities/notifier.entity'
 import TravelEntity from '../entities/travel.entity'
 import * as express from 'express'
+import CronTravelEntity from '../entities/cronTravel.entity'
 
 export default class NotifierController {
 
@@ -25,6 +26,10 @@ export default class NotifierController {
   static async delete (req: express.Request, res: express.Response) {
     const travelsWithThisNotifier = await TravelEntity.find({ notifier: req.params.id })
     if (travelsWithThisNotifier.length > 0) return res.status(400).send({ msg: `You can't delete a notifier attached.` })
+
+    const cronTravelsWithThisNotifier = await CronTravelEntity.find({ notifier: req.params.id })
+    if (cronTravelsWithThisNotifier.length > 0) return res.status(400).send({ msg: `You can't delete a notifier attached.` })
+
     const notifier = await NotifierEntity.delete({ id: req.params.id })
     return res.send(notifier)
   }

@@ -6,15 +6,20 @@ import * as cors from 'cors'
 import TravelController from './src/controllers/travel.controller'
 import NotifierController from './src/controllers/notifier.controller'
 import BookerController from './src/controllers/booker.controller'
+import CronTravelController from './src/controllers/cronTravel.controller'
 import fetch from 'node-fetch'
+import CronTravelEntity from './src/entities/cronTravel.entity'
 
 const db = new Database()
 const app = express()
 db.connect().then(async () => {
   await TravelEntity.deleteOld()
-  const travels = await TravelEntity.find({ relations: ['notifier', 'booker'] })
+  const travels = await TravelEntity.find({ where: { booked: false }, relations: ['notifier', 'booker', 'cron'] })
   travels.forEach(travel => travel.init())
-  console.log(`${travels.length} travels initiated.`)
+  console.log(`${travels.length} travel(s) initiated.`)
+
+  const crons = await CronTravelEntity.reloadAll()
+  console.log(`${crons.length} cron(s) initiated.`)
 
   app.use(cors())
   app.use(bodyParser.json())
@@ -22,6 +27,7 @@ db.connect().then(async () => {
   router.use('/travels', TravelController.router)
   router.use('/notifiers', NotifierController.router)
   router.use('/bookers', BookerController.router)
+  router.use('/crons', CronTravelController.router)
   router.use('/stations/autocomplete', async (req: express.Request, res: express.Response) => {
     if (req.query.searchTerm.length < 2) {
       return res.send([])
@@ -33,5 +39,8 @@ db.connect().then(async () => {
   app.use('/api', router)
 
   app.listen(8080, _ => console.log('App listen on 0.0.0.0:8080'))
-  setInterval(_ => TravelEntity.deleteOld(), 60 * 60 * 1000)
+  setInterval(async _ => {
+    await TravelEntity.deleteOld()
+    await CronTravelEntity.reloadAll()
+  }, 60 * 60 * 1000)
 })

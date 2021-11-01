@@ -1,18 +1,31 @@
 'use strict'
 
-import "reflect-metadata";
-import { createConnection, Connection } from "typeorm";
-import { SqliteConnectionOptions } from "typeorm/driver/sqlite/SqliteConnectionOptions";
+import { createConnection, Connection } from 'typeorm'
+import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions'
+import { SqliteConnectionOptions } from 'typeorm/driver/sqlite/SqliteConnectionOptions'
+import config from './config'
 
 export default class Database {
   private connection: Connection
-  private config: SqliteConnectionOptions = {
-    type: 'sqlite',
-    database: process.env.POSTGRES_DATABASE || 'tgvmax.sqlite'
-  }
+  private config: SqliteConnectionOptions | PostgresConnectionOptions
 
-  constructor(config?: SqliteConnectionOptions) {
-    Object.assign(this.config, config)
+  constructor() {
+    switch (config.database) {
+      case 'sqlite':
+        this.config = {
+          type: 'sqlite',
+          database: config.sqlite.file,
+        }
+        break
+      case 'postgres':
+        this.config = {
+          type: 'postgres',
+          url: `postgres://${config.postgres.username}:${config.postgres.password}@${config.postgres.host}/${config.postgres.database}`
+        }
+        break
+      default:
+        throw new Error('Database configuration is invalid')
+    }
   }
 
   async connect(): Promise<Connection> {
