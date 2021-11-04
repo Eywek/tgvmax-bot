@@ -282,8 +282,13 @@ export default class TrainlineBooker implements BookerInterface {
     const bookableTrips = trips.trips
       .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
       .filter((trip) => {
-        // filter hours (sometimes trainline returns trains that doesn't respect the request)
+        // sometimes trainline returns trains that doesn't respect the request
         const date = new Date(trip.departure_date)
+
+        if (this.travel.date.getDay() !== date.getDay() || this.travel.date.getMonth() !== date.getMonth()) {
+          return false
+        }
+
         if (this.travel.minHour && date.getHours() < this.travel.minHour) {
           return false
         }
@@ -526,7 +531,7 @@ export default class TrainlineBooker implements BookerInterface {
       content += `\n- ${this.travel.from}-${this.travel.to}: ${getHourFromDate(new Date(trip.departure_date))}-${getHourFromDate(new Date(trip.arrival_date))}`
     })
     if (this.travel.book) {
-      content += `\n\n Une reservation va etre tentee pour le premier train.`
+      content += `\n\nUne reservation va etre tentee pour le premier train.`
     }
     return content
   }
@@ -534,7 +539,7 @@ export default class TrainlineBooker implements BookerInterface {
   private formatMessageBooked(trip: SearchTrainResponse['trips'][0], confirm: ConfirmResponse): string {
     let content = `Un billet a ete reserve pour le ${getHumanDate(new Date(trip.departure_date))} et une arrivee le ${getHumanDate(new Date(trip.arrival_date))}:`
     for (const segment of confirm.segments) {
-      content += `\n- train #${segment.train_number || 'inconnu'} (voiture ${segment.car || 'inconnue'} siege ${segment.seat || 'inconnu'})`
+      content += `\n- train ${segment.train_number || 'inconnu'} (voiture ${segment.car || 'inconnue'} siege ${segment.seat || 'inconnu'})`
     }
     return content
   }
