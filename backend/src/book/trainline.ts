@@ -9,11 +9,11 @@ const trainlineStations = require('../../trainline_stations.json')
 
 const endpoint = 'https://www.trainline.fr/api/v5_1'
 const headers = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36',
-  'x-user-agent': 'CaptainTrain/1629887560(web) (Ember 3.9.1)',
-  'x-not-a-bot': 'i-am-human',
-  'origin': 'chrome-extension://fhbjgbiflinjbdggehcddcbncdddomop',
-  'accept' : '*/*',
+  Accept: 'application/json',
+  'X-CT-Request-Context': 'user',
+  'User-Agent': 'CaptainTrain/63(6301) Android/10(29)',
+  'X-CT-Client-Id': '9e60bd6b-af2a-4d4f-be1a-77c554cc87d2',
+  'Accept-Language': 'en',
 }
 
 type LoginRequest = {
@@ -279,6 +279,10 @@ export default class TrainlineBooker implements BookerInterface {
       departureStationId: this.departureId,
       arrivalStationId: this.arrivalId,
     })
+    if (!trips.trips) {
+      this.logger('Response has no trips', trips)
+      return
+    }
     const bookableTrips = trips.trips
       .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
       .filter((trip) => {
@@ -297,6 +301,13 @@ export default class TrainlineBooker implements BookerInterface {
         }
         return true
       })
+      .filter((a, i, trips) => {
+         // deduplicate travels
+        const tripIndex = trips.findIndex((b) => (a.departure_date === b.departure_date && a.arrival_date === b.arrival_date))
+        if (tripIndex === i) {
+          return true
+        }
+      })
       .sort((a, b) => a.departure_date.localeCompare(b.departure_date))
     if (bookableTrips.length === 0) {
       this.logger('No bookable trip')
@@ -307,6 +318,9 @@ export default class TrainlineBooker implements BookerInterface {
     const trip = bookableTrips[0]
 
     await this.notifier.send(this.formatMessageAvailable(bookableTrips))
+    if (!this.travel.book) {
+      return
+    }
 
     this.logger(`Book trip ${trip.id}`)
     const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: trips.search.id })
