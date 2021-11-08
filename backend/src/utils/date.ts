@@ -1,8 +1,18 @@
 export const getHourFromDate = (date: Date) => {
-  return date.getHours().toString().padStart(2, '0') + 'h' +
-    date.getMinutes().toString().padStart(2, '0')
+  return new Intl.DateTimeFormat([], {
+    timeZone: 'Europe/Paris',
+    hour: 'numeric',
+    minute: 'numeric',
+  }).format(date)
 }
 
 export const getHumanDate = (date: Date) => {
-  return date.toISOString().split('T')[0] + ' a ' + getHourFromDate(date)
+  return new Intl.DateTimeFormat([], {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+  }).format(date)
 }
