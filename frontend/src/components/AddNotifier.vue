@@ -64,7 +64,7 @@ export default {
       username: null,
       password: null,
       type: null,
-      types: ['sms']
+      types: ['sms', 'telegram']
     }
   },
   methods: {
