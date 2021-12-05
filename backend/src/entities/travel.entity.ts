@@ -76,7 +76,7 @@ export default class TravelEntity extends BaseEntity {
       .where(`strftime('%s', date) < '${d.getTime() / 1000}'`)
       .getMany()
     for (const travel of travels) {
-      debug(`delete travel ${travel.id}`)
+      logger(`delete travel ${travel.id}`)
       await travel.delete()
     }
   }

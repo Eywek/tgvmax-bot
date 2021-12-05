@@ -149,11 +149,11 @@ export default {
     formatAutocomplete (results) {
       return results.filter((result) => {
         return result.category === 'station' && (result.type === 'G' || result.type === 'L')
-      }).map(r => ({ label: r.label, id: r.rrCode }))
+      }).map(r => ({ label: r.label, id: r.rrCode || r.id.replace('RESARAIL_STA_', '') }))
     },
     autocompleteSelected (key) {
       return (value) => {
-        this[key] = value.rrCode
+        this[key] = value.id
         return value.label
       }
     },
@@ -167,7 +167,7 @@ export default {
         body: JSON.stringify({
           from: this.from,
           to: this.to,
-          date: new Date(this.date.toDateString() + ' UTC'),
+          date: this.date.toISOString().split('T')[0],
           minHour: this.minHour,
           maxHour: this.maxHour,
           notifier: this.notifier,

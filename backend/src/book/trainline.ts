@@ -265,7 +265,7 @@ export default class TrainlineBooker implements BookerInterface {
 
   private async check() {
     if (this.travel.booked) {
-      debug('Already booked: ignore')
+      this.logger('Already booked: ignore')
       return
     }
 
