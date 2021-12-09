@@ -36,6 +36,7 @@ type LoginResponse = {
   }
   passengers: {
     id: string
+    is_selected: boolean
     first_name: string
     last_name: string
     card_ids: any[]
@@ -521,7 +522,7 @@ export default class TrainlineBooker implements BookerInterface {
     })
     let token: LoginResponse = await res.json()
     this.token = token
-
+    this.token.passengers = token.passengers.filter(p => p.is_selected)
     if (this.token.passengers.length > 1) {
       this.notifier.send(`Il y a ${this.token.passengers.length} passagers sur ce compte Trainline, seulement le premier (${this.token.passengers[0].first_name}) sera utilise pour la reservation.`)
     }
