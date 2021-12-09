@@ -34,17 +34,21 @@ jobs:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: ${{ runner.os }}-buildx-
+          
+      - name: Lowercase repository
+        run: |
+          echo ::set-env name=IMAGE_REPOSITORY::$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
 
       - name: Push backend
         uses: docker/build-push-action@v2
         with:
           push: true
           context: backend
-          tags: ghcr.io/${{ github.repository }}-backend:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_REPOSITORY }}-backend:${{ github.sha }}
 
       - name: Push frontend
         uses: docker/build-push-action@v2
         with:
           push: true
           context: frontend
-          tags: ghcr.io/${{ github.repository }}-frontend:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_REPOSITORY }}-frontend:${{ github.sha }}
