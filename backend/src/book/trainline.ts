@@ -239,7 +239,7 @@ export default class TrainlineBooker implements BookerInterface {
     this.travel = travel
     this.notifier = notifier
     this.credentials = credentials
-    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.date}`)
+    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date}`)
     this.logger(`Init booker`)
 
     this.departureId = trainlineStations[this.travel.from]
@@ -263,15 +263,16 @@ export default class TrainlineBooker implements BookerInterface {
     clearInterval(this.interval)
   }
 
-  private get date () {
-    return this.travel.date.toISOString().split('T')[0]
-  }
-
   private async check() {
+    if (this.travel.booked) {
+      this.logger('Already booked: ignore')
+      return
+    }
+
     if (!(await this.checkToken())) {
       await this.login()
     }
-    const date = this.travel.date
+    const date = new Date(this.travel.date)
     date.setHours(this.travel.minHour)
 
     const trips = await this.search({
@@ -331,8 +332,9 @@ export default class TrainlineBooker implements BookerInterface {
     this.logger(`Confirm payment ${payment.payment.id}`)
     const confirm = await this.confirm({ paymentId: payment.payment.id, pnrIds: book.book.pnr_ids })
 
-    this.logger(`Trip booked! Delete travel`)
-    TravelEntity.deleteById(this.travel.id)
+    this.logger(`Trip booked!`)
+    this.travel.booked = true
+    await this.travel.save()
 
     return this.notifier.send(this.formatMessageBooked(trip, confirm))
   }
@@ -540,7 +542,7 @@ export default class TrainlineBooker implements BookerInterface {
   }
 
   private formatMessageAvailable (trips: SearchTrainResponse['trips']): string {
-    let content = `Des billets TGVMax sont disponible pour le ${this.date}:`
+    let content = `Des billets TGVMax sont disponible pour le ${this.travel.date}:`
     trips.forEach((trip) => {
       content += `\n- ${this.travel.from}-${this.travel.to}: ${getHourFromDate(new Date(trip.departure_date))}-${getHourFromDate(new Date(trip.arrival_date))}`
     })

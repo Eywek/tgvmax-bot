@@ -12,10 +12,10 @@ export default class BookerEntity extends BaseEntity {
   @Column()
   name: string
 
-  @Column()
+  @Column({ nullable: true })
   username?: string
 
-  @Column()
+  @Column({ nullable: true })
   password?: string
 
   @Column()

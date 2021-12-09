@@ -12,7 +12,7 @@ export default class TravelController {
   }
 
   static async list (req: express.Request, res: express.Response) {
-    const travels = await TravelEntity.find({ relations: ['notifier', 'booker'] })
+    const travels = await TravelEntity.find({ relations: ['notifier', 'booker', 'cron'] })
     return res.send(travels)
   }
 
@@ -24,7 +24,9 @@ export default class TravelController {
   }
 
   static async delete (req: express.Request, res: express.Response) {
-    const travel = await TravelEntity.deleteById(req.params.id)
+    const travel = await TravelEntity.findOne({ id: parseInt(req.params.id) })
+    if (!travel) return res.status(404).send({ msg: 'Travel is not found' })
+    await travel.delete()
     return res.send(travel)
   }
 
