@@ -37,7 +37,7 @@ jobs:
           
       - name: Lowercase repository
         run: |
-          echo ::set-env name=IMAGE_REPOSITORY::$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_REPOSITORY=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Push backend
         uses: docker/build-push-action@v2
