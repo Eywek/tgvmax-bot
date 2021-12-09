@@ -1,6 +1,6 @@
 name: ci
 permissions:
-  packages: read|write
+  packages: write
 on:
   push:
     branches:
