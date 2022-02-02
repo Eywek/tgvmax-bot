@@ -20,7 +20,7 @@ export default class TravelEntity extends BaseEntity {
   to: string
 
   @Column()
-  date: string
+  date: Date
 
   @Column({ nullable: true })
   minHour?: number

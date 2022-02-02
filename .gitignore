@@ -5,6 +5,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 backend/*.sqlite
+trainline_stations.json
 
 # Editor directories and files
 .idea
