@@ -1,4 +1,11 @@
-FROM node:16-alpine
+FROM node:16.13.0-buster-slim
+
+RUN apt-get update && apt-get install -y \
+      libcurl4-openssl-dev \
+      ca-certificates \
+      build-essential \
+      python \
+      python3
 
 COPY ./ /usr/src
 WORKDIR /usr/src
