@@ -138,7 +138,7 @@ export default {
       notifier: null,
       booker: null,
       book: true,
-      autocompleteEndpoint: `${process.env.API_URL}/stations/autocomplete?uc=fr-FR&searchField=origin&searchTerm=`
+      autocompleteEndpoint: `${process.env.API_URL}/stations/autocomplete?searchTerm=`
     }
   },
   computed: {
@@ -147,9 +147,7 @@ export default {
   },
   methods: {
     formatAutocomplete (results) {
-      return results.filter((result) => {
-        return result.category === 'station' && (result.type === 'G' || result.type === 'L')
-      }).map(r => ({ label: r.label, id: r.rrCode || r.id.replace('RESARAIL_STA_', '') }))
+      return results.map(r => ({ label: r.name, id: r.id }))
     },
     autocompleteSelected (key) {
       return (value) => {

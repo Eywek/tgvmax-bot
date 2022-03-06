@@ -5,7 +5,12 @@ import { NotifierInterface } from '../notify/interface'
 import { getHourFromDate, getHumanDate } from '../utils/date'
 import * as debug from 'debug'
 
-const trainlineStations = require('../../trainline_stations.json')
+const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
+export interface TrainlineStation {
+  trainlineId: string
+  sncfId: string
+  name: string
+}
 
 const endpoint = 'https://www.trainline.fr/api/v5_1'
 const headers = {
@@ -243,14 +248,14 @@ export default class TrainlineBooker implements BookerInterface {
     this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date}`)
     this.logger(`Init booker`)
 
-    this.departureId = trainlineStations[this.travel.from]
+    this.departureId = trainlineStations.find(s => s.sncfId === this.travel.from).trainlineId
     if (!this.departureId) {
       this.logger(`Cannot get trainline id for station "${this.travel.from}"`)
       return
     }
-    this.arrivalId = trainlineStations[this.travel.to]
+    this.arrivalId = trainlineStations.find(s => s.sncfId === this.travel.to).trainlineId
     if (!this.arrivalId) {
-      this.logger(`Cannot get trainline id for station "${this.travel.from}"`)
+      this.logger(`Cannot get trainline id for station "${this.travel.to}"`)
       return
     }
 

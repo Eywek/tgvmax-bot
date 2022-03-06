@@ -9,6 +9,9 @@ import BookerController from './src/controllers/booker.controller'
 import CronTravelController from './src/controllers/cronTravel.controller'
 import fetch from 'node-fetch'
 import CronTravelEntity from './src/entities/cronTravel.entity'
+import { TrainlineStation } from './src/book/trainline'
+
+const trainlineStations: TrainlineStation[] = require('./trainline_stations.json')
 
 const db = new Database()
 const app = express()
@@ -32,9 +35,11 @@ db.connect().then(async () => {
     if (req.query.searchTerm.length < 2) {
       return res.send([])
     }
-    // @ts-ignore
-    const result = await fetch(`https://www.oui.sncf/booking/autocomplete-d2d?${req._parsedUrl.query}`)
-    return res.send(await result.json())
+    res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(req.query.searchTerm.toLowerCase())).map(searchResult => ({
+      id: searchResult.sncfId,
+      tlId: searchResult.trainlineId,
+      name: searchResult.name,
+    })))
   })
   app.use('/api', router)
 
