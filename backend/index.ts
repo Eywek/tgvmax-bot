@@ -17,7 +17,7 @@ const db = new Database()
 const app = express()
 db.connect().then(async () => {
   await TravelEntity.deleteOld()
-  const travels = await TravelEntity.find({ where: { booked: false }, relations: ['notifier', 'booker', 'cron'] })
+  const travels = await TravelEntity.find({ relations: ['notifier', 'booker', 'cron'] })
   travels.forEach(travel => travel.init())
   console.log(`${travels.length} travel(s) initiated.`)
 
@@ -35,11 +35,14 @@ db.connect().then(async () => {
     if (req.query.searchTerm.length < 2) {
       return res.send([])
     }
-    res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(req.query.searchTerm.toLowerCase())).map(searchResult => ({
+    return res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(req.query.searchTerm.toLowerCase())).map(searchResult => ({
       id: searchResult.sncfId,
       tlId: searchResult.trainlineId,
       name: searchResult.name,
     })))
+  })
+  router.use('/stations/id/:id', async (req: express.Request, res: express.Response) => {
+    return res.send(trainlineStations.find((s => s.sncfId === req.params.id)))
   })
   app.use('/api', router)
 

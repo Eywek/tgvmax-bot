@@ -1,5 +1,7 @@
+import config from './config'
+
 export const getHourFromDate = (date: Date) => {
-  return new Intl.DateTimeFormat([], {
+  return new Intl.DateTimeFormat([ config.dateFormat ], {
     timeZone: 'Europe/Paris',
     hour: 'numeric',
     minute: 'numeric',
@@ -7,7 +9,7 @@ export const getHourFromDate = (date: Date) => {
 }
 
 export const getHumanDate = (date: Date) => {
-  return new Intl.DateTimeFormat([], {
+  return new Intl.DateTimeFormat([ config.dateFormat ], {
     timeZone: 'Europe/Paris',
     year: 'numeric',
     month: 'numeric',

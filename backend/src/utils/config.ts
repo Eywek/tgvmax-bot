@@ -1,4 +1,5 @@
 export default {
+  dateFormat: process.env.DATE_FORMAT || 'sv', // sv uses YYYY-MM-DD hh:mm
   database: process.env.DATABASE as 'sqlite' | 'postgres' ?? 'sqlite',
   sqlite: {
     file: process.env.SQLITE_FILE || 'tgvmax.sqlite'
