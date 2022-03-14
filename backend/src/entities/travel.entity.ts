@@ -26,7 +26,13 @@ export default class TravelEntity extends BaseEntity {
   minHour?: number
 
   @Column({ nullable: true })
+  minMinute?: number
+
+  @Column({ nullable: true })
   maxHour?: number
+
+  @Column({ nullable: true })
+  maxMinute?: number
 
   @ManyToOne(type => NotifierEntity, notifier => notifier.travels)
   @JoinColumn()

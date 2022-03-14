@@ -21,7 +21,13 @@ export default class CronTravelEntity extends BaseEntity {
   minHour?: number
 
   @Column({ nullable: true })
+  minMinute?: number
+
+  @Column({ nullable: true })
   maxHour?: number
+
+  @Column({ nullable: true })
+  maxMinute?: number
 
   @Column()
   cron: string
@@ -68,12 +74,14 @@ export default class CronTravelEntity extends BaseEntity {
         from: this.from,
         to: this.to,
         minHour: this.minHour,
+        minMinute: this.minMinute,
         maxHour: this.maxHour,
+        maxMinute: this.maxMinute,
         date: next,
         notifier: this.notifier,
         book: this.book,
         booker: this.booker,
-        cron: this,
+        cron: { id: this.id },
       }))
     }
 

@@ -18,12 +18,23 @@
         <div class="font-bold text-xl">
           {{ travel.from }} → {{ travel.to }}
           <div class="text-gray-500 float-right text-base font-normal">
-            {{ travel.date }}
-            <span v-if="travel.minHour"><span v-if="!travel.maxHour">></span>{{ travel.minHour }}h</span><span v-if="travel.minHour && travel.maxHour">-</span><span v-if="travel.maxHour"><span v-if="!travel.minHour"></span>{{ travel.maxHour }}h</span>
+            {{ new Intl.DateTimeFormat('sv', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date(travel.date)) }}
+            <span v-if="travel.minHour">
+              <span v-if="!travel.maxHour">≥</span>
+              {{ travel.minHour }}h<span v-if="travel.minMinute">{{ travel.minMinute }}</span>
+            </span>
+            <span v-if="travel.minHour && travel.maxHour">-</span>
+            <span v-if="travel.maxHour">
+              <span v-if="!travel.minHour">≤</span>
+              {{ travel.maxHour }}h<span v-if="travel.maxMinute">{{ travel.maxMinute }}</span>
+            </span>
           </div>
         </div>
-        <p class="text-gray-700 text-base">
+        <p class="text-gray-700 text-base" v-if="!travel.booked">
           Le train sera vérifié <span v-if="travel.book">et reservé </span>avec {{ travel.booker.type }} ({{ travel.booker.name }})
+        </p>
+        <p class="text-gray-700 text-base" v-if="travel.booked">
+          Le train a été reservé avec {{ travel.booker.type }} ({{ travel.booker.name }})
         </p>
         <p class="text-gray-700 text-base">
           Vous serez notifié via {{ travel.notifier.type }} ({{ travel.notifier.name }})

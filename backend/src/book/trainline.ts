@@ -300,10 +300,16 @@ export default class TrainlineBooker implements BookerInterface {
           return false
         }
 
-        if (this.travel.minHour && date.getHours() < this.travel.minHour) {
+        if (this.travel.minHour && date.getHours() <= this.travel.minHour) {
+          return false
+        }
+        if (this.travel.minMinute && date.getMinutes() <= this.travel.minMinute) {
           return false
         }
         if (this.travel.maxHour && date.getHours() > this.travel.maxHour) {
+          return false
+        }
+        if (this.travel.maxMinute && date.getMinutes() > this.travel.maxMinute) {
           return false
         }
         return true
@@ -548,7 +554,7 @@ export default class TrainlineBooker implements BookerInterface {
   }
 
   private formatMessageAvailable (trips: SearchTrainResponse['trips']): string {
-    let content = `Des billets TGVMax sont disponible pour le ${this.travel.date}:`
+    let content = `Des billets TGVMax sont disponible pour le ${getHumanDate(this.travel.date)}:`
     trips.forEach((trip) => {
       content += `\n- ${this.travel.from}-${this.travel.to}: ${getHourFromDate(new Date(trip.departure_date))}-${getHourFromDate(new Date(trip.arrival_date))}`
     })
