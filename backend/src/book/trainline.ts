@@ -300,10 +300,10 @@ export default class TrainlineBooker implements BookerInterface {
           return false
         }
 
-        if (this.travel.minHour && date.getHours() <= this.travel.minHour) {
+        if (this.travel.minHour && date.getHours() < this.travel.minHour) {
           return false
         }
-        if (this.travel.minMinute && date.getMinutes() <= this.travel.minMinute) {
+        if (this.travel.minMinute && date.getMinutes() < this.travel.minMinute) {
           return false
         }
         if (this.travel.maxHour && date.getHours() > this.travel.maxHour) {

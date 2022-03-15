@@ -19,7 +19,15 @@
           {{ cron.from }} → {{ cron.to }}
           <div class="text-gray-500 float-right text-base font-normal">
             <span>{{ cron.cron }}</span>
-            <span v-if="cron.minHour"><span v-if="!cron.maxHour">></span>{{ cron.minHour }}h</span><span v-if="cron.minHour && cron.maxHour">-</span><span v-if="cron.maxHour"><span v-if="!cron.minHour"></span>{{ cron.maxHour }}h</span>
+            <span v-if="cron.minHour">
+              <span v-if="!cron.maxHour">≥</span>
+              {{ cron.minHour }}h<span v-if="cron.minMinute">{{ cron.minMinute }}</span>
+            </span>
+            <span v-if="cron.minHour && cron.maxHour">-</span>
+            <span v-if="cron.maxHour">
+              <span v-if="!cron.minHour">≤</span>
+              {{ cron.maxHour }}h<span v-if="cron.maxMinute">{{ cron.maxMinute }}</span>
+            </span>
           </div>
         </div>
         <p class="text-gray-700 text-base">

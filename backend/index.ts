@@ -7,7 +7,6 @@ import TravelController from './src/controllers/travel.controller'
 import NotifierController from './src/controllers/notifier.controller'
 import BookerController from './src/controllers/booker.controller'
 import CronTravelController from './src/controllers/cronTravel.controller'
-import fetch from 'node-fetch'
 import CronTravelEntity from './src/entities/cronTravel.entity'
 import { TrainlineStation } from './src/book/trainline'
 
