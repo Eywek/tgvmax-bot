@@ -193,7 +193,7 @@ export default {
         body: JSON.stringify({
           from: this.from,
           to: this.to,
-          date: this.date.toISOString().split('T')[0],
+          date: this.date.toLocaleDateString('sv'),
           minHour: parseInt(this.minHour),
           minMinute: parseInt(this.minMinute),
           maxHour: parseInt(this.maxHour),
