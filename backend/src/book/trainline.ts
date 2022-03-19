@@ -88,6 +88,7 @@ type SearchTrainResponse = {
   }[]
   trips?: {
     id: string
+    digest: string
     segment_ids: string[]
     folder_id: string
     departure_date: string
@@ -227,6 +228,17 @@ type ConfirmResponse = {
     car?: string
     seat?: string
     train_number?: string
+    formatted_seating?: string // e.g.: Upstairs, 4 seater booth, aisle
+  }[]
+}
+
+type PNRsResponse = {
+  travel_documents: {
+    id: string
+    pnr_id: string
+    label: 'boarding_pass' | null // boarding_pass is PDF, null can be pkpass
+    filename: string
+    url: string
   }[]
 }
 
@@ -245,7 +257,7 @@ export default class TrainlineBooker implements BookerInterface {
     this.travel = travel
     this.notifier = notifier
     this.credentials = credentials
-    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date}`)
+    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
     this.logger(`Init booker`)
 
     this.departureId = trainlineStations.find(s => s.sncfId === this.travel.from).trainlineId
@@ -290,28 +302,37 @@ export default class TrainlineBooker implements BookerInterface {
       this.logger('Response has no trips', trips)
       return
     }
+    this.logger(`got ${trips.trips.length} trips for the request`)
     const bookableTrips = trips.trips
       .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
       .filter((trip) => {
+        this.logger(`compare trip digest ${trip.digest}`)
+
         // sometimes trainline returns trains that doesn't respect the request
         const date = new Date(trip.departure_date)
 
+        this.logger(`compare date ${getHumanDate(this.travel.date)} ${getHumanDate(date)}`)
         if (this.travel.date.getDay() !== date.getDay() || this.travel.date.getMonth() !== date.getMonth()) {
           return false
         }
 
+        this.logger(`compare minHour ${this.travel.minHour} ${date.getHours()}`)
         if (this.travel.minHour && date.getHours() < this.travel.minHour) {
           return false
         }
+        this.logger(`compare minMinute ${this.travel.minMinute} ${date.getMinutes()}`)
         if (this.travel.minMinute && date.getMinutes() < this.travel.minMinute) {
           return false
         }
+        this.logger(`compare maxHour ${this.travel.maxHour} ${date.getHours()}`)
         if (this.travel.maxHour && date.getHours() > this.travel.maxHour) {
           return false
         }
+        this.logger(`compare maxMinute ${this.travel.maxMinute} ${date.getMinutes()}`)
         if (this.travel.maxMinute && date.getMinutes() > this.travel.maxMinute) {
           return false
         }
+        this.logger(`trip is okay with specs`)
         return true
       })
       .filter((a, i, trips) => {
@@ -348,7 +369,17 @@ export default class TrainlineBooker implements BookerInterface {
     this.travel.booked = true
     await this.travel.save()
 
-    return this.notifier.send(this.formatMessageBooked(trip, confirm))
+    await this.notifier.send(this.formatMessageBooked(trip, confirm))
+
+    this.logger(`Looking for documents`)
+    const documents = await this.documents({ pnrIds: book.book.pnr_ids })
+    const pkPasses = documents.filter(document => document.filename.includes('.pkpass'))
+    if (pkPasses.length === 0) {
+      this.notifier.send(this.formatMessageAttachment(trip, confirm, documents))
+    } else {
+      const pkPasses = documents.filter(document => document.filename.includes('.pkpass'))
+      this.notifier.send(this.formatMessageAttachment(trip, confirm, documents))
+    }
   }
 
   private async search(input: {
@@ -516,6 +547,20 @@ export default class TrainlineBooker implements BookerInterface {
     return confirm
   }
 
+  private async documents(input: { pnrIds: string[] }): Promise<PNRsResponse['travel_documents']> {
+    const res = await fetch(endpoint + '/pnrs', {
+      method: 'GET',
+      headers: {
+        ...headers,
+        'authorization': `Token token="${this.token.meta.token}"`,
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+    })
+    const documents: PNRsResponse = await res.json()
+    return documents.travel_documents.filter((document) => input.pnrIds.includes(document.pnr_id))
+  }
+
   private async login() {
     this.logger('login')
     const res = await fetch(endpoint + '/account/signin', {
@@ -568,6 +613,14 @@ export default class TrainlineBooker implements BookerInterface {
     let content = `Un billet a ete reserve pour le ${getHumanDate(new Date(trip.departure_date))} et une arrivee le ${getHumanDate(new Date(trip.arrival_date))}:`
     for (const segment of confirm.segments) {
       content += `\n- train ${segment.train_number || 'inconnu'} (voiture ${segment.car || 'inconnue'} siege ${segment.seat || 'inconnu'})`
+    }
+    return content
+  }
+
+  private formatMessageAttachment(trip: SearchTrainResponse['trips'][0], confirm: ConfirmResponse, documents: PNRsResponse['travel_documents']): string {
+    let content = `Documents pour votre voyage le ${getHumanDate(new Date(trip.departure_date))}:`
+    for (const document of documents) {
+      content += `\n- ${document.url}`
     }
     return content
   }
