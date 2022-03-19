@@ -86,7 +86,7 @@ type SearchTrainResponse = {
     cents: number // should be 0 if the train is free
     system: 'sncf' | 'flixbus' | 'busbud' | 'pao_sncf' | 'pao_ouigo' | string
   }[]
-  trips?: {
+  trips: {
     id: string
     digest: string
     segment_ids: string[]
@@ -118,7 +118,7 @@ type SearchTrainResponse = {
     name: string // long name (e.g. Lyon (Perrache))
     slug: string // e.g. lyon
   }[]
-  search?: {
+  search: {
     id: string
     is_next_available?: boolean
     is_previous_available?: boolean
@@ -290,74 +290,23 @@ export default class TrainlineBooker implements BookerInterface {
     if (!(await this.checkToken())) {
       await this.login()
     }
-    const date = new Date(this.travel.date)
-    date.setHours(this.travel.minHour)
 
-    const trips = await this.search({
-      departure: date,
-      departureStationId: this.departureId,
-      arrivalStationId: this.arrivalId,
-    })
-    if (!trips.trips) {
-      this.logger('Response has no trips', trips)
+    const { trips, searchId } = await this.getTrips()
+    if (trips.length === 0) {
+      this.logger('Got no trips')
       return
     }
-    this.logger(`got ${trips.trips.length} trips for the request`)
-    const bookableTrips = trips.trips
-      .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
-      .filter((trip) => {
-        this.logger(`compare trip digest ${trip.digest}`)
+    this.logger(`Got ${trips.length} bookable trips`)
 
-        // sometimes trainline returns trains that doesn't respect the request
-        const date = new Date(trip.departure_date)
-
-        this.logger(`compare date ${getHumanDate(this.travel.date)} ${getHumanDate(date)}`)
-        if (this.travel.date.getDay() !== date.getDay() || this.travel.date.getMonth() !== date.getMonth()) {
-          return false
-        }
-
-        this.logger(`compare minHour ${this.travel.minHour} ${date.getHours()}`)
-        if (this.travel.minHour && date.getHours() < this.travel.minHour) {
-          return false
-        }
-        this.logger(`compare minMinute ${this.travel.minMinute} ${date.getMinutes()}`)
-        if (this.travel.minMinute && date.getMinutes() < this.travel.minMinute) {
-          return false
-        }
-        this.logger(`compare maxHour ${this.travel.maxHour} ${date.getHours()}`)
-        if (this.travel.maxHour && date.getHours() > this.travel.maxHour) {
-          return false
-        }
-        this.logger(`compare maxMinute ${this.travel.maxMinute} ${date.getMinutes()}`)
-        if (this.travel.maxMinute && date.getMinutes() > this.travel.maxMinute) {
-          return false
-        }
-        this.logger(`trip is okay with specs`)
-        return true
-      })
-      .filter((a, i, trips) => {
-         // deduplicate travels
-        const tripIndex = trips.findIndex((b) => (a.departure_date === b.departure_date && a.arrival_date === b.arrival_date))
-        if (tripIndex === i) {
-          return true
-        }
-      })
-      .sort((a, b) => a.departure_date.localeCompare(b.departure_date))
-    if (bookableTrips.length === 0) {
-      this.logger('No bookable trip')
-      return
-    }
-    this.logger(`Found ${bookableTrips.length} trips`)
-
-    const trip = bookableTrips[0]
-
-    await this.notifier.send(this.formatMessageAvailable(bookableTrips))
+    await this.notifier.send(this.formatMessageAvailable(trips))
     if (!this.travel.book) {
       return
     }
+    
+    const trip = trips[0]
 
     this.logger(`Book trip ${trip.id}`)
-    const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: trips.search.id })
+    const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: searchId })
 
     this.logger(`Pay pnr ${book.book.pnr_ids.join(',')}`)
     const payment = await this.payment({ pnrIds: book.book.pnr_ids })
@@ -370,15 +319,94 @@ export default class TrainlineBooker implements BookerInterface {
     await this.travel.save()
 
     await this.notifier.send(this.formatMessageBooked(trip, confirm))
+  }
 
-    this.logger(`Looking for documents`)
-    const documents = await this.documents({ pnrIds: book.book.pnr_ids })
-    const pkPasses = documents.filter(document => document.filename.includes('.pkpass'))
-    if (pkPasses.length === 0) {
-      this.notifier.send(this.formatMessageAttachment(trip, confirm, documents))
-    } else {
-      const pkPasses = documents.filter(document => document.filename.includes('.pkpass'))
-      this.notifier.send(this.formatMessageAttachment(trip, confirm, documents))
+  private async getTrips(): Promise<{ trips: SearchTrainResponse['trips']; searchId: string }> {
+    const minDate = new Date(this.travel.date)
+    minDate.setHours(this.travel.minHour ?? 0)
+    minDate.setMinutes(this.travel.minMinute ?? 0, 0)
+    const maxDate = new Date(this.travel.date)
+    maxDate.setHours(this.travel.maxHour ?? 23)
+    maxDate.setMinutes(this.travel.maxMinute ?? 59, 59)
+
+    const bookableTrips: SearchTrainResponse['trips'] = []
+    
+    this.logger('search')
+    const trips = await this.search({
+      departure: minDate,
+      departureStationId: this.departureId,
+      arrivalStationId: this.arrivalId,
+    })
+    if (!trips.trips) {
+      this.logger('Response has no trips', trips)
+      return
+    }
+
+    const { trips: filteredTrips, lastDate: ld } = this.filterTrips(trips.trips)
+    for (const trip of filteredTrips) {
+      bookableTrips.push(trip)
+    }
+    let lastDate: Date | undefined = ld
+    while (lastDate?.getTime() < maxDate.getTime()) {
+      this.logger('search next')
+      const { trips: nextTrips, lastDate: nextLastDate } = this.filterTrips((await this.searchNext(trips.search.id)).trips)
+      for (const trip of nextTrips) {
+        bookableTrips.push(trip)
+      }
+      lastDate = nextLastDate
+    }
+
+    return {
+      trips: bookableTrips.filter((a, i, trips) => {
+        // deduplicate travels
+        const tripIndex = trips.findIndex((b) => (a.departure_date === b.departure_date && a.arrival_date === b.arrival_date))
+        if (tripIndex === i) {
+          return true
+        }
+      }),
+      searchId: trips.search.id,
+    }
+  }
+
+  private filterTrips(trips: SearchTrainResponse['trips']): { trips: SearchTrainResponse['trips']; lastDate?: Date } {
+    this.logger(`got ${trips.length} trips for the request`)
+
+    trips = trips.sort((a, b) => a.departure_date.localeCompare(b.departure_date))
+    const bookableTrips = trips
+      .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
+      .filter((trip) => {
+        // sometimes trainline returns trains that doesn't respect the request
+        const date = new Date(trip.departure_date)
+
+        if (this.travel.date.getDay() !== date.getDay() || this.travel.date.getMonth() !== date.getMonth()) {
+          return false
+        }
+
+        if (this.travel.minHour && date.getHours() < this.travel.minHour) {
+          return false
+        }
+        if (this.travel.minMinute && date.getMinutes() < this.travel.minMinute) {
+          return false
+        }
+        if (this.travel.maxHour && date.getHours() > this.travel.maxHour) {
+          return false
+        }
+        if (this.travel.maxMinute && date.getMinutes() > this.travel.maxMinute) {
+          return false
+        }
+        return true
+      })
+    if (bookableTrips.length === 0) {
+      this.logger('No bookable trip')
+      return {
+        trips: [],
+        lastDate: trips.length > 0 && new Date(trips[trips.length - 1].departure_date),
+      }
+    }
+    this.logger(`Found ${bookableTrips.length} trips`)
+    return {
+      trips: bookableTrips,
+      lastDate: trips.length > 0 && new Date(trips[trips.length - 1].departure_date),
     }
   }
 
@@ -417,6 +445,20 @@ export default class TrainlineBooker implements BookerInterface {
       } as SearchTrainRequest),
     })
 
+    const trips: SearchTrainResponse = await res.json()
+    return trips
+  }
+
+  private async searchNext(searchId: string) {
+    const res = await fetch(endpoint + '/search/' + searchId + '/next', {
+      method: 'GET',
+      headers: {
+        ...headers,
+        'authorization': `Token token="${this.token.meta.token}"`,
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+    })
     const trips: SearchTrainResponse = await res.json()
     return trips
   }
@@ -545,20 +587,6 @@ export default class TrainlineBooker implements BookerInterface {
     })
     const confirm: ConfirmResponse = await res.json()
     return confirm
-  }
-
-  private async documents(input: { pnrIds: string[] }): Promise<PNRsResponse['travel_documents']> {
-    const res = await fetch(endpoint + '/pnrs', {
-      method: 'GET',
-      headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'content-type': 'application/json',
-      },
-    })
-    const documents: PNRsResponse = await res.json()
-    return documents.travel_documents.filter((document) => input.pnrIds.includes(document.pnr_id))
   }
 
   private async login() {
