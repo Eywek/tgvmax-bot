@@ -1,6 +1,6 @@
-import * as fetch from 'node-fetch'
+import fetch from 'node-fetch'
 import { NotifierInterface } from '../notify/interface'
-import * as debug from 'debug'
+import debug from 'debug'
 import { BookerInterface } from './interface'
 import TravelEntity from '../entities/travel.entity'
 import { getHourFromDate } from '../utils/date'
@@ -18,7 +18,7 @@ export default class OuiSNCFBooker implements BookerInterface {
   private endpoint: string
   private interval: NodeJS.Timeout
   private notifier: NotifierInterface
-  private logger: debug
+  private logger: debug.Debugger
 
   constructor (travel: TravelEntity, notifier: NotifierInterface) {
     this.travel = travel

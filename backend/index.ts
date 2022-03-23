@@ -31,10 +31,11 @@ db.connect().then(async () => {
   router.use('/bookers', BookerController.router)
   router.use('/crons', CronTravelController.router)
   router.use('/stations/autocomplete', async (req: express.Request, res: express.Response) => {
-    if (req.query.searchTerm.length < 2) {
+    if (typeof req.query.searchTerm !== 'string' || req.query.searchTerm.length < 2) {
       return res.send([])
     }
-    return res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(req.query.searchTerm.toLowerCase())).map(searchResult => ({
+    const search = req.query.searchTerm
+    return res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(search.toLowerCase())).map(searchResult => ({
       id: searchResult.sncfId,
       tlId: searchResult.trainlineId,
       name: searchResult.name,
@@ -45,7 +46,7 @@ db.connect().then(async () => {
   })
   app.use('/api', router)
 
-  app.listen(8080, _ => console.log('App listen on 0.0.0.0:8080'))
+  app.listen(8080, () => console.log('App listen on 0.0.0.0:8080'))
   setInterval(async _ => {
     await TravelEntity.deleteOld()
     await CronTravelEntity.reloadAll()

@@ -1,9 +1,9 @@
 import { BookerInterface, Credentials } from './interface'
-import * as fetch from 'node-fetch'
+import fetch from 'node-fetch'
 import TravelEntity from '../entities/travel.entity'
 import { NotifierInterface } from '../notify/interface'
 import { getHourFromDate, getHumanDate } from '../utils/date'
-import * as debug from 'debug'
+import debug from 'debug'
 
 const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
 export interface TrainlineStation {
@@ -136,7 +136,7 @@ type BookRequest = {
   }
 }
 type BookResponse = {
-  pnrs?: { // there is generally only 1 PNR if it's one-way ticket
+  pnrs: { // there is generally only 1 PNR if it's one-way ticket
     id: string
     system: 'pao_sncf' | string
   }[]
@@ -182,7 +182,7 @@ type PaymentRequest = {
   }
 }
 type PaymentResponse = {
-  payment?: {
+  payment: {
     id: string
     status: 'waiting_for_confirmation' | string
   }
@@ -223,7 +223,7 @@ type ConfirmRequest = {
 	}
 }
 type ConfirmResponse = {
-  segments?: {
+  segments: {
     id: string
     car?: string
     seat?: string
@@ -248,7 +248,7 @@ export default class TrainlineBooker implements BookerInterface {
   private interval: NodeJS.Timeout
   private travel: TravelEntity
   private notifier: NotifierInterface
-  private logger: debug
+  private logger: debug.Debugger
 
   private departureId: string
   private arrivalId: string
@@ -260,16 +260,16 @@ export default class TrainlineBooker implements BookerInterface {
     this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
     this.logger(`Init booker`)
 
-    this.departureId = trainlineStations.find(s => s.sncfId === this.travel.from).trainlineId
-    if (!this.departureId) {
-      this.logger(`Cannot get trainline id for station "${this.travel.from}"`)
-      return
+    const departureId = trainlineStations.find(s => s.sncfId === this.travel.from)?.trainlineId
+    if (!departureId) {
+      throw new Error(`Cannot get trainline id for station "${this.travel.from}"`)
     }
-    this.arrivalId = trainlineStations.find(s => s.sncfId === this.travel.to).trainlineId
-    if (!this.arrivalId) {
-      this.logger(`Cannot get trainline id for station "${this.travel.to}"`)
-      return
+    this.departureId = departureId
+    const arrivalId = trainlineStations.find(s => s.sncfId === this.travel.to)?.trainlineId
+    if (!arrivalId) {
+      throw new Error(`Cannot get trainline id for station "${this.travel.to}"`)
     }
+    this.arrivalId = arrivalId
 
     this.interval = setInterval(this.check.bind(this), 1000 * 60 * 30)
     this.interval.unref()
@@ -291,7 +291,11 @@ export default class TrainlineBooker implements BookerInterface {
       await this.login()
     }
 
-    const { trips, searchId } = await this.getTrips()
+    const tripsResult = await this.getTrips()
+    if (!tripsResult) {
+      return
+    }
+    const { trips, searchId } = tripsResult
     if (trips.length === 0) {
       this.logger('Got no trips')
       return
@@ -307,6 +311,10 @@ export default class TrainlineBooker implements BookerInterface {
 
     this.logger(`Book trip ${trip.id}`)
     const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: searchId })
+    if (!book.book) {
+      this.logger('No book')
+      return
+    }
 
     this.logger(`Pay pnr ${book.book.pnr_ids.join(',')}`)
     const payment = await this.payment({ pnrIds: book.book.pnr_ids })
@@ -321,7 +329,7 @@ export default class TrainlineBooker implements BookerInterface {
     await this.notifier.send(this.formatMessageBooked(trip, confirm))
   }
 
-  private async getTrips(): Promise<{ trips: SearchTrainResponse['trips']; searchId: string }> {
+  private async getTrips(): Promise<{ trips: SearchTrainResponse['trips']; searchId: string } | undefined> {
     const minDate = new Date(this.travel.date)
     minDate.setHours(this.travel.minHour ?? 0)
     minDate.setMinutes(this.travel.minMinute ?? 0, 0)
@@ -347,7 +355,7 @@ export default class TrainlineBooker implements BookerInterface {
       bookableTrips.push(trip)
     }
     let lastDate: Date | undefined = ld
-    while (lastDate?.getTime() < maxDate.getTime()) {
+    while (lastDate && lastDate.getTime() < maxDate.getTime()) {
       this.logger('search next')
       const { trips: nextTrips, lastDate: nextLastDate } = this.filterTrips((await this.searchNext(trips.search.id)).trips)
       for (const trip of nextTrips) {
@@ -400,13 +408,13 @@ export default class TrainlineBooker implements BookerInterface {
       this.logger('No bookable trip')
       return {
         trips: [],
-        lastDate: trips.length > 0 && new Date(trips[trips.length - 1].departure_date),
+        lastDate: trips.length > 0 ? new Date(trips[trips.length - 1].departure_date) : undefined,
       }
     }
     this.logger(`Found ${bookableTrips.length} trips`)
     return {
       trips: bookableTrips,
-      lastDate: trips.length > 0 && new Date(trips[trips.length - 1].departure_date),
+      lastDate: trips.length > 0 ? new Date(trips[trips.length - 1].departure_date) : undefined,
     }
   }
 
@@ -415,6 +423,10 @@ export default class TrainlineBooker implements BookerInterface {
     departureStationId: string,
     arrivalStationId: string
   }): Promise<SearchTrainResponse> {
+    if (!this.token) {
+      throw new Error('Not logged in')
+    }
+
     const res = await fetch(endpoint + '/search', {
       method: 'POST',
       headers: {
@@ -450,6 +462,10 @@ export default class TrainlineBooker implements BookerInterface {
   }
 
   private async searchNext(searchId: string) {
+    if (!this.token) {
+      throw new Error('Not logged in')
+    }
+
     const res = await fetch(endpoint + '/search/' + searchId + '/next', {
       method: 'GET',
       headers: {
@@ -468,6 +484,10 @@ export default class TrainlineBooker implements BookerInterface {
     folderId: string
     searchId: string
   }): Promise<BookResponse> {
+    if (!this.token) {
+      throw new Error('Not logged in')
+    }
+
     const options: Record<string, any> = {}
     for (const sid of input.segmentIds) {
       options[sid] = {
@@ -492,10 +512,15 @@ export default class TrainlineBooker implements BookerInterface {
       } as BookRequest),
     })
     const book: BookResponse = await res.json()
+    this.logger(`book response:`, book)
     return book
   }
 
   private async payment(input: { pnrIds: string[] }) {
+    if (!this.token) {
+      throw new Error('Not logged in')
+    }
+
     const res = await fetch(endpoint + '/payments', {
       method: 'POST',
       headers: {
@@ -537,10 +562,15 @@ export default class TrainlineBooker implements BookerInterface {
       } as PaymentRequest),
     })
     const payment: PaymentResponse = await res.json()
+    this.logger(`payment response:`, payment)
     return payment
   }
 
   private async confirm(input: { paymentId: string, pnrIds: string[] }) {
+    if (!this.token) {
+      throw new Error('Not logged in')
+    }
+
     const res = await fetch(endpoint + '/payments/' + input.paymentId + '/confirm', {
       method: 'POST',
       headers: {
@@ -586,6 +616,7 @@ export default class TrainlineBooker implements BookerInterface {
       } as ConfirmRequest)
     })
     const confirm: ConfirmResponse = await res.json()
+    this.logger(`confirm response:`, confirm)
     return confirm
   }
 

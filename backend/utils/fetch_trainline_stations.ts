@@ -1,4 +1,4 @@
-import * as fetch from 'node-fetch'
+import fetch from 'node-fetch'
 const parse = require('csv-parse/lib/sync')
 import { writeFileSync } from 'fs'
 import { TrainlineStation } from '../src/book/trainline'

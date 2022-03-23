@@ -6,7 +6,7 @@ import { SqliteConnectionOptions } from 'typeorm/driver/sqlite/SqliteConnectionO
 import config from './config'
 
 export default class Database {
-  private connection: Connection
+  private connection!: Connection
   private config: SqliteConnectionOptions | PostgresConnectionOptions
 
   constructor() {
@@ -15,12 +15,14 @@ export default class Database {
         this.config = {
           type: 'sqlite',
           database: config.sqlite.file,
+          logging: true,
         }
         break
       case 'postgres':
         this.config = {
           type: 'postgres',
-          url: `postgres://${config.postgres.username}:${config.postgres.password}@${config.postgres.host}/${config.postgres.database}`
+          url: `postgres://${config.postgres.username}:${config.postgres.password}@${config.postgres.host}/${config.postgres.database}`,
+          logging: true,
         }
         break
       default:
