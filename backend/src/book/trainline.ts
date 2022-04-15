@@ -331,6 +331,10 @@ export default class TrainlineBooker implements BookerInterface {
 
     this.logger(`Book trip ${trip.id}`)
     const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: trips.search.id })
+    if (typeof book.book === 'undefined') {
+      this.logger(`Unable to book`, book)
+      return
+    }
 
     this.logger(`Pay pnr ${book.book.pnr_ids.join(',')}`)
     const payment = await this.payment({ pnrIds: book.book.pnr_ids })
