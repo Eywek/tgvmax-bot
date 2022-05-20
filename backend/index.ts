@@ -36,8 +36,8 @@ db.connect().then(async () => {
     if (typeof req.query.searchTerm !== 'string' || req.query.searchTerm.length < 2) {
       return res.send([])
     }
-    const search = req.query.searchTerm
-    return res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(search.toLowerCase())).map(searchResult => ({
+    const search = req.query.searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return res.send(trainlineStations.filter((s) => s.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(search)).map(searchResult => ({
       id: searchResult.sncfId,
       tlId: searchResult.trainlineId,
       name: searchResult.name,
