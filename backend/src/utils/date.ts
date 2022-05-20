@@ -8,6 +8,16 @@ export const getHourFromDate = (date: Date) => {
   }).format(date)
 }
 
+export const getDate = (date: Date) => {
+  return new Intl.DateTimeFormat([ config.dateFormat ], {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).format(date)
+}
+
+
 export const getHumanDate = (date: Date) => {
   return new Intl.DateTimeFormat([ config.dateFormat ], {
     timeZone: 'Europe/Paris',

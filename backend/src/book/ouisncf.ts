@@ -3,7 +3,7 @@ import { NotifierInterface } from '../notify/interface'
 import debug from 'debug'
 import { BookerInterface } from './interface'
 import TravelEntity from '../entities/travel.entity'
-import { getHourFromDate } from '../utils/date'
+import { getDate, getHourFromDate } from '../utils/date'
 
 type Ticket = {
   id: string
@@ -68,7 +68,7 @@ export default class OuiSNCFBooker implements BookerInterface {
   }
 
   private formatMessage (tickets: Array<Ticket>): string {
-    let content = `Des billets TGVMax sont disponible pour le ${this.travel.date}:`
+    let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     tickets.forEach((ticket) => {
       content += `\n- ${this.from}-${this.to}: ${getHourFromDate(ticket.departureDate)}-${getHourFromDate(ticket.arrivalDate)}`
     })

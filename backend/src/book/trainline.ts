@@ -2,7 +2,7 @@ import { BookerInterface, Credentials } from './interface'
 import fetch from 'node-fetch'
 import TravelEntity from '../entities/travel.entity'
 import { NotifierInterface } from '../notify/interface'
-import { getHourFromDate, getHumanDate } from '../utils/date'
+import { getDate, getHourFromDate, getHumanDate } from '../utils/date'
 import debug from 'debug'
 
 const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
@@ -658,7 +658,7 @@ export default class TrainlineBooker implements BookerInterface {
   }
 
   private formatMessageAvailable (trips: SearchTrainResponse['trips']): string {
-    let content = `Des billets TGVMax sont disponible pour le ${getHumanDate(this.travel.date)}:`
+    let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     trips.forEach((trip) => {
       content += `\n- ${this.travel.from}-${this.travel.to}: ${getHourFromDate(new Date(trip.departure_date))}-${getHourFromDate(new Date(trip.arrival_date))}`
     })
