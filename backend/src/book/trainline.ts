@@ -675,12 +675,4 @@ export default class TrainlineBooker implements BookerInterface {
     }
     return content
   }
-
-  private formatMessageAttachment(trip: SearchTrainResponse['trips'][0], confirm: ConfirmResponse, documents: PNRsResponse['travel_documents']): string {
-    let content = `Documents pour votre voyage le ${getHumanDate(new Date(trip.departure_date))}:`
-    for (const document of documents) {
-      content += `\n- ${document.url}`
-    }
-    return content
-  }
 }
