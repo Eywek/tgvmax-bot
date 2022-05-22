@@ -24,13 +24,13 @@ export default class BookerController {
   }
 
   static async delete (req: express.Request, res: express.Response) {
-    const travelsWithThisBooker = await TravelEntity.find({ booker: req.params.id })
+    const travelsWithThisBooker = await TravelEntity.find({ booker: { id: parseInt(req.params.id) } })
     if (travelsWithThisBooker.length > 0) return res.status(400).send({ msg: `You can't delete a booker attached.` })
 
-    const cronTravelsWithThisBooker = await CronTravelEntity.find({ booker: req.params.id })
+    const cronTravelsWithThisBooker = await CronTravelEntity.find({ booker: { id: parseInt(req.params.id) } })
     if (cronTravelsWithThisBooker.length > 0) return res.status(400).send({ msg: `You can't delete a booker attached.` })
 
-    const booker = await BookerEntity.delete({ id: req.params.id })
+    const booker = await BookerEntity.delete({ id: parseInt(req.params.id) })
     return res.send(booker)
   }
 

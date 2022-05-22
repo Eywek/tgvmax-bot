@@ -1,5 +1,5 @@
 import { NotifierInterface, Credentials } from './interface'
-import * as fetch from 'node-fetch'
+import fetch from 'node-fetch'
 
 export default class SmsNotifier implements NotifierInterface {
   private credentials: Credentials

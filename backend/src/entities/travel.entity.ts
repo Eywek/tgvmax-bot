@@ -4,6 +4,7 @@ import NotifierEntity from './notifier.entity'
 import BookerEntity from './booker.entity'
 import CronTravelEntity from './cronTravel.entity'
 import * as debug from 'debug'
+import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity"
 const logger = debug('entity:travel')
 
 const bookers = new Map<number, BookerInterface>()
@@ -11,44 +12,53 @@ const bookers = new Map<number, BookerInterface>()
 @Entity({name: "travels"})
 export default class TravelEntity extends BaseEntity {
   @PrimaryGeneratedColumn()
-  id: number
+  id!: number
 
   @Column()
-  from: string
+  from!: string
 
   @Column()
-  to: string
+  to!: string
 
   @Column()
-  date: Date
+  date!: Date
 
   @Column({ nullable: true })
   minHour?: number
 
   @Column({ nullable: true })
+  minMinute?: number
+
+  @Column({ nullable: true })
   maxHour?: number
+
+  @Column({ nullable: true })
+  maxMinute?: number
 
   @ManyToOne(type => NotifierEntity, notifier => notifier.travels)
   @JoinColumn()
-  notifier: NotifierEntity
+  notifier?: NotifierEntity
 
   @Column({ default: false })
-  book: boolean
+  book!: boolean
 
   @Column({ default: false })
-  booked: boolean
+  booked!: boolean
 
   @ManyToOne(type => BookerEntity, booker => booker.travels)
   @JoinColumn()
-  booker: BookerEntity
+  booker?: BookerEntity
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt!: Date
 
   @ManyToOne(type => CronTravelEntity, cron => cron.travels, { nullable: true })
   cron?: CronTravelEntity
   
   init (): void {
+    if (!this.notifier || !this.booker) {
+      throw new Error(`No booker or notifier for travel ${this.id}`)
+    }
     logger(`Init booker for ${this.id} (${this.from}-${this.to}_${this.date}) (notifier: '${this.notifier.name}')`)
     bookers.set(this.id, this.booker.init(this, this.notifier.init()))
   }
@@ -59,13 +69,12 @@ export default class TravelEntity extends BaseEntity {
     await this.remove()
   }
 
-  static async insertAndCrawl(...args): Promise<TravelEntity> {
-    // @ts-ignore
-    const res = await this.insert(...args)
+  static async insertAndCrawl(args: QueryDeepPartialEntity<TravelEntity>): Promise<TravelEntity> {
+    const res = await this.insert(args)
     const id = res.generatedMaps[0].id
-    const travel = await this.findOne({ id }, { relations: ['notifier', 'booker'] })
-    travel.init()
-    return travel
+    const travel = await this.findOne({ id }, { relations: ['notifier', 'booker', 'cron'] })
+    travel!.init()
+    return travel!
   }
 
   static async deleteOld(): Promise<void> {

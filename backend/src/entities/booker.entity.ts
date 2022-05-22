@@ -7,10 +7,10 @@ import TravelEntity from './travel.entity'
 export default class BookerEntity extends BaseEntity {
 
   @PrimaryGeneratedColumn()
-  id: number
+  id!: number
 
   @Column()
-  name: string
+  name!: string
 
   @Column({ nullable: true })
   username?: string
@@ -19,13 +19,13 @@ export default class BookerEntity extends BaseEntity {
   password?: string
 
   @Column()
-  type: BookerType
+  type!: BookerType
 
   @OneToMany(type => TravelEntity, travel => travel.booker)
-  travels: TravelEntity[]
+  travels?: TravelEntity[]
 
   @CreateDateColumn()
-  created_at: Date
+  created_at!: Date
 
   toJSON() {
     return Object.assign({}, this, { password: undefined })
@@ -33,8 +33,8 @@ export default class BookerEntity extends BaseEntity {
 
   init (travel: TravelEntity, notifier: NotifierInterface): BookerInterface {
     const booker = createBooker(this.type, travel, notifier, {
-      username: this.username,
-      password: this.password
+      username: this.username!,
+      password: this.password!,
     })
     return booker
   } 

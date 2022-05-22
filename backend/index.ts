@@ -7,17 +7,18 @@ import TravelController from './src/controllers/travel.controller'
 import NotifierController from './src/controllers/notifier.controller'
 import BookerController from './src/controllers/booker.controller'
 import CronTravelController from './src/controllers/cronTravel.controller'
-import fetch from 'node-fetch'
 import CronTravelEntity from './src/entities/cronTravel.entity'
 import { TrainlineStation } from './src/book/trainline'
+import * as telegram from './src/notify/telegram'
 
 const trainlineStations: TrainlineStation[] = require('./trainline_stations.json')
 
 const db = new Database()
 const app = express()
 db.connect().then(async () => {
+  telegram.start()
   await TravelEntity.deleteOld()
-  const travels = await TravelEntity.find({ where: { booked: false }, relations: ['notifier', 'booker', 'cron'] })
+  const travels = await TravelEntity.find({ relations: ['notifier', 'booker', 'cron'] })
   travels.forEach(travel => travel.init())
   console.log(`${travels.length} travel(s) initiated.`)
 
@@ -32,18 +33,22 @@ db.connect().then(async () => {
   router.use('/bookers', BookerController.router)
   router.use('/crons', CronTravelController.router)
   router.use('/stations/autocomplete', async (req: express.Request, res: express.Response) => {
-    if (req.query.searchTerm.length < 2) {
+    if (typeof req.query.searchTerm !== 'string' || req.query.searchTerm.length < 2) {
       return res.send([])
     }
-    res.send(trainlineStations.filter((s) => s.name.toLocaleLowerCase().includes(req.query.searchTerm.toLowerCase())).map(searchResult => ({
+    const search = req.query.searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return res.send(trainlineStations.filter((s) => s.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(search)).map(searchResult => ({
       id: searchResult.sncfId,
       tlId: searchResult.trainlineId,
       name: searchResult.name,
     })))
   })
+  router.use('/stations/id/:id', async (req: express.Request, res: express.Response) => {
+    return res.send(trainlineStations.find((s => s.sncfId === req.params.id)))
+  })
   app.use('/api', router)
 
-  app.listen(8080, _ => console.log('App listen on 0.0.0.0:8080'))
+  app.listen(8080, () => console.log('App listen on 0.0.0.0:8080'))
   setInterval(async _ => {
     await TravelEntity.deleteOld()
     await CronTravelEntity.reloadAll()

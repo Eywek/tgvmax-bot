@@ -4,50 +4,57 @@ import NotifierEntity from './notifier.entity'
 import TravelEntity from './travel.entity'
 import * as debug from 'debug'
 import * as parser from 'cron-parser'
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 const logger = debug('entity:cronTravel')
 
 @Entity({name: 'cron_travels'})
 export default class CronTravelEntity extends BaseEntity {
   @PrimaryGeneratedColumn()
-  id: number
+  id!: number
 
   @Column()
-  from: string
+  from!: string
 
   @Column()
-  to: string
+  to!: string
 
   @Column({ nullable: true })
   minHour?: number
 
   @Column({ nullable: true })
+  minMinute?: number
+
+  @Column({ nullable: true })
   maxHour?: number
 
-  @Column()
-  cron: string
+  @Column({ nullable: true })
+  maxMinute?: number
 
   @Column()
-  maxTravels: number
+  cron!: string
+
+  @Column()
+  maxTravels!: number
 
   @OneToMany(type => TravelEntity, travel => travel.cron)
-  travels: TravelEntity[]
+  travels?: TravelEntity[]
 
   @Column({ nullable: true })
   lastTravelDate?: string
 
   @ManyToOne(type => NotifierEntity, notifier => notifier.travels) // TODO: oops
   @JoinColumn()
-  notifier: NotifierEntity
+  notifier?: NotifierEntity
 
   @Column({ default: false })
-  book: boolean
+  book!: boolean
 
   @ManyToOne(type => BookerEntity, booker => booker.travels) // TODO: oops
   @JoinColumn()
-  booker: BookerEntity
+  booker!: BookerEntity
 
   @CreateDateColumn()
-  created_at: Date
+  created_at!: Date
 
   public async run() {
     const travels = await TravelEntity.find({ where: { cron: { id: this.id } } })
@@ -64,12 +71,15 @@ export default class CronTravelEntity extends BaseEntity {
       n.setMinutes(n.getMinutes() - n.getTimezoneOffset())
       next = n.toISOString().split('T')[0]
 
+      logger(`Cron ${this.id} add travel for ${next}`)
       newTravels.push(await TravelEntity.insertAndCrawl({
         from: this.from,
         to: this.to,
         minHour: this.minHour,
+        minMinute: this.minMinute,
         maxHour: this.maxHour,
-        date: next,
+        maxMinute: this.maxMinute,
+        date: new Date(next),
         notifier: this.notifier,
         book: this.book,
         booker: this.booker,
@@ -79,19 +89,18 @@ export default class CronTravelEntity extends BaseEntity {
 
     this.lastTravelDate = next
     await this.save()
-    this.travels = newTravels
   }
 
-  static async insertAndInit(...args): Promise<CronTravelEntity> {
-    for (const cron of args) {
-      // verify crons syntax
-      parser.parseExpression(cron.cron)
+  static async insertAndInit(args: QueryDeepPartialEntity<CronTravelEntity>): Promise<CronTravelEntity> {
+    if (!args.cron || typeof args.cron !== 'string') {
+      throw new Error('Cron has no cron')
     }
+    parser.parseExpression(args.cron)
 
     // @ts-ignore
-    const res = await this.insert(...args)
+    const res = await this.insert(args)
     const id = res.generatedMaps[0].id
-    const cron = await this.findOne({ id }, { relations: ['notifier', 'booker'] })
+    const cron = await this.findOneOrFail({ id }, { relations: ['notifier', 'booker'] })
     await cron.run()
     return cron
   }
@@ -112,7 +121,7 @@ export default class CronTravelEntity extends BaseEntity {
   }
 
   static async reloadAll() {
-    const crons = await CronTravelEntity.find({ relations: ['notifier', 'booker', 'travels'] })
+    const crons = await CronTravelEntity.find({ relations: ['notifier', 'booker'] })
     await Promise.all(crons.map(async cron => await cron.run()))
     return crons
   }

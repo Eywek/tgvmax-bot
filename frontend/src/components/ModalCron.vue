@@ -71,6 +71,20 @@
           </div>
           <div class="w-1/2 pl-2">
             <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2" for="minMinute">Minute minimum</label>
+              <input
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none"
+                id="minMinute"
+                type="text"
+                placeholder="Optionnal"
+                v-model="minMinute"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="flex mb-4">
+          <div class="w-1/2 pr-2">
+            <div class="mb-4">
               <label class="block text-gray-700 text-sm font-bold mb-2" for="maxHour">Heure maximum</label>
               <input
                 class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none"
@@ -78,6 +92,18 @@
                 type="text"
                 placeholder="Optionnal"
                 v-model="maxHour"
+              />
+            </div>
+          </div>
+          <div class="w-1/2 pl-2">
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2" for="maxMinute">Minute maximum</label>
+              <input
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none"
+                id="maxMinute"
+                type="text"
+                placeholder="Optionnal"
+                v-model="maxMinute"
               />
             </div>
           </div>
@@ -150,7 +176,9 @@ export default {
       to: null,
       cron: null,
       minHour: null,
+      minMinute: null,
       maxHour: null,
+      maxMinute: null,
       notifier: null,
       booker: null,
       book: true,
@@ -184,7 +212,9 @@ export default {
           to: this.to,
           cron: this.cron,
           minHour: parseInt(this.minHour),
+          minMinute: parseInt(this.minMinute),
           maxHour: parseInt(this.maxHour),
+          maxMinute: parseInt(this.maxMinute),
           notifier: this.notifier,
           booker: this.booker,
           book: this.book,
