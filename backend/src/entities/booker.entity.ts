@@ -18,7 +18,7 @@ export default class BookerEntity extends BaseEntity {
   @Column({ nullable: true })
   password?: string
 
-  @Column()
+  @Column({ type: 'varchar' })
   type: BookerType
 
   @OneToMany(type => TravelEntity, travel => travel.booker)

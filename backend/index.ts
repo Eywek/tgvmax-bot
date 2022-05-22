@@ -43,7 +43,7 @@ db.connect().then(async () => {
   })
   app.use('/api', router)
 
-  app.listen(8080, _ => console.log('App listen on 0.0.0.0:8080'))
+  app.listen(8081, _ => console.log('App listen on 0.0.0.0:8081'))
   setInterval(async _ => {
     await TravelEntity.deleteOld()
     await CronTravelEntity.reloadAll()
