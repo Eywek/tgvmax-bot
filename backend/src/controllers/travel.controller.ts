@@ -1,6 +1,6 @@
 import TravelEntity from '../entities/travel.entity'
 import * as express from 'express'
-import { TrainlineSearcher } from '../book/trainline'
+import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker } from '../book/trainline'
 import BookerEntity from '../entities/booker.entity'
 
 export default class TravelController {
@@ -11,6 +11,7 @@ export default class TravelController {
     routerTravels.post('/', this.create)
     routerTravels.delete('/:id', this.delete)
     routerTravels.get('/journeys', this.listJourneys)
+    routerTravels.get('/journeys/book', this.bookJourney)
     return routerTravels
   }
 
@@ -67,15 +68,18 @@ export default class TravelController {
       return res.status(400).send({ msg: 'Unable to find the booker.' })
     }
 
-    const searcher = new TrainlineSearcher({
-      from: String(req.query.from),
-      to: String(req.query.to),
-      date: new Date(String(req.query.date))
-    }, { username: booker.username!, password: booker.password! })
-
-    const trips = await searcher.bookAndPay()
-    searcher.destroy()
-
-    return res.send(trips.map(searcher.formatTrip))
+    const confirmation = await TrainlineBooker.bookAndPay(
+      new TrainlineAuthentifier({ username: booker.username!, password: booker.password! }),
+      {
+        segmentIds: Array.isArray(req.query.segmentIds) ? req.query.segmentIds as string[] : [String(req.query.segmentIds)],
+        folderId: String(req.query.folderId),
+        searchId: String(req.query.searchId)
+      }
+    )
+    if (typeof confirmation === 'undefined') {
+      res.statusCode = 500
+      return res.send({ message: 'Failed to book' })
+    }
+    return res.send(confirmation)
   }
 }
