@@ -11,7 +11,7 @@ export default class TravelController {
     routerTravels.post('/', this.create)
     routerTravels.delete('/:id', this.delete)
     routerTravels.get('/journeys', this.listJourneys)
-    routerTravels.get('/journeys/book', this.bookJourney)
+    routerTravels.post('/journeys/book', this.bookJourney)
     return routerTravels
   }
 
@@ -58,10 +58,10 @@ export default class TravelController {
   }
 
   static async bookJourney (req: express.Request, res: express.Response) {
-    if (!req.query.segmentIds) return res.status(400).send({ msg: 'You need to provide a segmentIds.' })
-    if (!req.query.folderId) return res.status(400).send({ msg: 'You need to provide a folderId.' })
-    if (!req.query.searchId) return res.status(400).send({ msg: 'You need to provide a searchId.' })
-    if (!req.query.bookerId) return res.status(400).send({ msg: 'You need to provide a bookerId.' })
+    if (!Array.isArray(req.body.segmentIds)) return res.status(400).send({ msg: 'You need to provide a segmentIds.' })
+    if (!req.body.folderId) return res.status(400).send({ msg: 'You need to provide a folderId.' })
+    if (!req.body.searchId) return res.status(400).send({ msg: 'You need to provide a searchId.' })
+    if (!req.body.bookerId) return res.status(400).send({ msg: 'You need to provide a bookerId.' })
 
     const booker = await BookerEntity.findOne(String(req.query.bookerId))
     if (!booker) {
@@ -71,9 +71,9 @@ export default class TravelController {
     const confirmation = await TrainlineBooker.bookAndPay(
       new TrainlineAuthentifier({ username: booker.username!, password: booker.password! }),
       {
-        segmentIds: Array.isArray(req.query.segmentIds) ? req.query.segmentIds as string[] : [String(req.query.segmentIds)],
-        folderId: String(req.query.folderId),
-        searchId: String(req.query.searchId)
+        segmentIds: req.body.segmentIds,
+        folderId: req.body.folderId,
+        searchId: req.body.searchId
       }
     )
     if (typeof confirmation === 'undefined') {
