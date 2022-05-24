@@ -682,6 +682,9 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
     }
 
     const trips = await this.list()
+    if (trips.length === 0) {
+      return
+    }
     await this.notifier.send(this.formatMessageAvailable(trips))
     if (!this.travel.book) {
       return
