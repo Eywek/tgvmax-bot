@@ -1,5 +1,5 @@
 import { BookerInterface, Credentials } from './interface'
-import fetch from 'node-fetch'
+import fetch, { RequestInit } from 'node-fetch'
 import TravelEntity from '../entities/travel.entity'
 import { NotifierInterface } from '../notify/interface'
 import { getDate, getHourFromDate, getHumanDate } from '../utils/date'
@@ -242,23 +242,228 @@ type PNRsResponse = {
   }[]
 }
 
-export default class TrainlineBooker implements BookerInterface {
-  private credentials: Credentials
-  private token?: LoginResponse
-  private interval: NodeJS.Timeout
-  private travel: TravelEntity
-  private notifier: NotifierInterface
-  private logger: debug.Debugger
+export class TrainlineAuthentifier {
+  protected credentials: Credentials
+  protected token?: LoginResponse
+  protected logger: debug.Debugger
 
-  private departureId: string
-  private arrivalId: string
-
-  constructor(travel: TravelEntity, notifier: NotifierInterface, credentials: Credentials) {
-    this.travel = travel
-    this.notifier = notifier
+  constructor(credentials: Credentials) {
     this.credentials = credentials
-    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
-    this.logger(`Init booker`)
+    this.logger = debug(`trainline:auth:${this.credentials.username}`)
+  }
+
+  public async getToken () {
+    if (!(await this.checkToken())) {
+      await this.login()
+    }
+    return this.token!
+  }
+
+  public async request (endpoint: string, params: RequestInit) {
+    if (!(await this.checkToken())) {
+      await this.login()
+    }
+    return await fetch(endpoint, {
+      ...params,
+      headers: {
+        ...headers,
+        ...params.headers,
+        'authorization': `Token token="${this.token!.meta.token}"`,
+      }
+    })
+  }
+
+  protected async login() {
+    this.logger('login')
+    const res = await fetch(endpoint + '/account/signin', {
+      method: 'POST',
+      headers: {
+        ...headers,
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: 1,
+        email: this.credentials.username,
+        password: this.credentials.password,
+      } as LoginRequest)
+    })
+    let token: LoginResponse = await res.json()
+    this.token = token
+    this.token.passengers = token.passengers.filter(p => p.is_selected)
+  }
+
+  protected async checkToken(): Promise<boolean> {
+    if (!this.token) {
+      return false
+    }
+
+    const res = await fetch(endpoint + '/user', {
+      headers: {
+        ...headers,
+        'authorization': `Token token="${this.token.meta.token}"`,
+      }
+    })
+    return res.ok
+  }
+}
+
+export class TrainlineBooker {
+  public static async bookAndPay (
+    authentifier: TrainlineAuthentifier,
+    trip: { segmentIds: string[], folderId: string, searchId: string }
+  ) {
+    const book = await this.book(authentifier, trip)
+    if (!book.book) {
+      return
+    }
+
+    const payment = await this.payment(authentifier, { pnrIds: book.book.pnr_ids })
+    return await this.confirm(authentifier, { paymentId: payment.payment.id, pnrIds: book.book.pnr_ids })
+  }
+
+  private static async book(
+    authentifier: TrainlineAuthentifier,
+    input: {
+      segmentIds: string[]
+      folderId: string
+      searchId: string
+    }): Promise<BookResponse> {
+    const options: Record<string, any> = {}
+    for (const sid of input.segmentIds) {
+      options[sid] = {
+        comfort_class: 'pao.default',
+        seat: 'no_preference', // TODO: set a preference when creating the booker
+      }
+    }
+    const res = await authentifier.request(endpoint + '/book', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        book: {
+          options: options,
+          outward_folder_id: input.folderId,
+          search_id: input.searchId,
+        }
+      } as BookRequest),
+    })
+    const book: BookResponse = await res.json()
+    return book
+  }
+
+  private static async payment(
+    authentifier: TrainlineAuthentifier,
+    input: { pnrIds: string[] }
+  ) {
+    const res = await authentifier.request(endpoint + '/payments', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        payment: {
+          can_save_payment_card: false,
+          card_form_session: null,
+          cents: 0,
+          currency: 'EUR',
+          cvv_code: null,
+          device_data: null,
+          digitink_value: null,
+          expiration_month: null,
+          expiration_year: null,
+          holder: null,
+          is_new_customer: false,
+          mean: 'free',
+          nonce: null,
+          number: null,
+          order_id: null,
+          payment_card_id: null,
+          paypal_country: null,
+          paypal_email: null,
+          paypal_first_name: null,
+          paypal_last_name: null,
+          pnr_ids: input.pnrIds,
+          pro_save_card: false,
+          ravelin_device_id: null,
+          status: null,
+          verification_form: null,
+          verification_url: null,
+          wants_all_marketing: null
+        }
+      } as PaymentRequest),
+    })
+    const payment: PaymentResponse = await res.json()
+    return payment
+  }
+
+  private static async confirm(
+    authentifier: TrainlineAuthentifier,
+    input: { paymentId: string, pnrIds: string[] }
+  ) {
+    const res = await authentifier.request(endpoint + '/payments/' + input.paymentId + '/confirm', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/javascript, */*; q=0.01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        payment: {
+          after_sales_charge_ids: [],
+          can_save_payment_card: false,
+          card_form_session: null,
+          cents: 0,
+          coupon_ids: [],
+          currency: 'EUR',
+          cvv_code: null,
+          device_data: null,
+          digitink_value: null,
+          exchange_ids: [],
+          expiration_month: null,
+          expiration_year: null,
+          holder: null,
+          is_new_customer: false,
+          mean: 'free',
+          nonce: null,
+          number: null,
+          order_id: null,
+          payment_card_id: null,
+          paypal_country: null,
+          paypal_email: null,
+          paypal_first_name: null,
+          paypal_last_name: null,
+          pnr_ids: input.pnrIds,
+          pro_save_card: false,
+          ravelin_device_id: null,
+          status: 'waiting_for_confirmation',
+          subscription_ids: [],
+          verification_form: null,
+          verification_url: null,
+          wants_all_marketing: null
+        }
+      } as ConfirmRequest)
+    })
+    const confirm: ConfirmResponse = await res.json()
+    return confirm
+  }
+}
+
+export class TrainlineSearcher {
+  protected travel: Pick<TravelEntity, 'from' | 'to' | 'date' | 'minHour' | 'maxHour' | 'minMinute' | 'maxMinute'>
+  protected logger: debug.Debugger
+  protected authentifier: TrainlineAuthentifier
+
+  protected departureId: string
+  protected arrivalId: string
+
+  constructor(travel: TrainlineSearcher['travel'], credentials: Credentials) {
+    this.authentifier = new TrainlineAuthentifier(credentials)
+    this.travel = travel
+    this.logger = debug(`searcher:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
+    this.logger(`Init searcher`)
 
     const departureId = trainlineStations.find(s => s.sncfId === this.travel.from)?.trainlineId
     if (!departureId) {
@@ -270,63 +475,39 @@ export default class TrainlineBooker implements BookerInterface {
       throw new Error(`Cannot get trainline id for station "${this.travel.to}"`)
     }
     this.arrivalId = arrivalId
-
-    this.interval = setInterval(this.check.bind(this), 1000 * 60 * 30)
-    this.interval.unref()
-
-    this.check()
   }
 
-  async destroy () {
-    clearInterval(this.interval)
-  }
+  async destroy () {}
 
-  private async check() {
-    if (this.travel.booked) {
-      this.logger('Already booked: ignore')
-      return
-    }
-
-    if (!(await this.checkToken())) {
-      await this.login()
-    }
-
+  public async list () {
     const tripsResult = await this.getTrips()
     if (!tripsResult) {
-      return
+      return []
     }
     const { trips, searchId } = tripsResult
     if (trips.length === 0) {
       this.logger('Got no trips')
-      return
+      return []
     }
     this.logger(`Got ${trips.length} bookable trips`)
 
-    await this.notifier.send(this.formatMessageAvailable(trips))
-    if (!this.travel.book) {
-      return
+    return trips.map(trip => Object.assign(trip, { searchId }))
+  }
+
+  public formatTrip (trip: Awaited<ReturnType<TrainlineSearcher['list']>>[number]) {
+    return {
+      from: trip.departure_station_id,
+      fromFormatted: trainlineStations.find(s => s.trainlineId === trip.departure_station_id)!.name,
+      to: trip.arrival_station_id,
+      toFormatted: trainlineStations.find(s => s.trainlineId === trip.arrival_station_id)!.name,
+      departureDate: trip.departure_date,
+      formattedDepartureDate: getHumanDate(new Date(trip.departure_date)),
+      arrivalDate: trip.arrival_date,
+      formattedArrivalDate: getHumanDate(new Date(trip.arrival_date)),
+      book: {
+        segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: trip.searchId
+      }
     }
-    
-    const trip = trips[0]
-
-    this.logger(`Book trip ${trip.id}`)
-    const book = await this.book({ segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: searchId })
-    if (!book.book) {
-      this.logger('No book')
-      return
-    }
-
-    this.logger(`Pay pnr ${book.book.pnr_ids.join(',')}`)
-    const payment = await this.payment({ pnrIds: book.book.pnr_ids })
-
-    this.logger(`Confirm payment ${payment.payment.id}`)
-    const confirm = await this.confirm({ paymentId: payment.payment.id, pnrIds: book.book.pnr_ids })
-
-    this.logger(`Trip booked!`)
-    this.travel.booked = true
-    await this.travel.save()
-
-    await this.notifier.send(this.formatMessageBooked(trip, confirm))
   }
 
   private async getTrips(): Promise<{ trips: SearchTrainResponse['trips']; searchId: string } | undefined> {
@@ -356,10 +537,13 @@ export default class TrainlineBooker implements BookerInterface {
     }
     let lastDate: Date | undefined = ld
     while (lastDate && lastDate.getTime() < maxDate.getTime()) {
-      this.logger('search next')
+      this.logger(`search next, current date=${lastDate.toISOString()}`)
       const { trips: nextTrips, lastDate: nextLastDate } = this.filterTrips((await this.searchNext(trips.search.id)).trips)
       for (const trip of nextTrips) {
         bookableTrips.push(trip)
+      }
+      if (nextLastDate?.getTime() === lastDate.getTime()) {
+        break
       }
       lastDate = nextLastDate
     }
@@ -423,22 +607,16 @@ export default class TrainlineBooker implements BookerInterface {
     departureStationId: string,
     arrivalStationId: string
   }): Promise<SearchTrainResponse> {
-    if (!this.token) {
-      throw new Error('Not logged in')
-    }
-
-    const res = await fetch(endpoint + '/search', {
+    const res = await this.authentifier.request(endpoint + '/search', {
       method: 'POST',
       headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
         accept: 'application/json, text/javascript, */*; q=0.01',
         'content-type': 'application/json',
       },
       body: JSON.stringify({
         search: {
           arrival_station_id: input.arrivalStationId,
-          card_ids: this.token.passengers[0].card_ids,
+          card_ids: (await this.authentifier.getToken()).passengers[0].card_ids,
           cuis: {},
           departure_date: input.departure.toISOString(),
           departure_station_id: input.departureStationId,
@@ -446,7 +624,7 @@ export default class TrainlineBooker implements BookerInterface {
           exchangeable_pnr_id: null,
           is_next_available: false,
           is_previous_available: false,
-          passenger_ids: [ this.token.passengers[0].id ],
+          passenger_ids: [(await this.authentifier.getToken()).passengers[0].id],
           return_date: null,
           source: null,
           systems: [
@@ -462,15 +640,9 @@ export default class TrainlineBooker implements BookerInterface {
   }
 
   private async searchNext(searchId: string) {
-    if (!this.token) {
-      throw new Error('Not logged in')
-    }
-
-    const res = await fetch(endpoint + '/search/' + searchId + '/next', {
+    const res = await this.authentifier.request(endpoint + '/search/' + searchId + '/next', {
       method: 'GET',
       headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
         accept: 'application/json, text/javascript, */*; q=0.01',
         'content-type': 'application/json',
       },
@@ -478,189 +650,65 @@ export default class TrainlineBooker implements BookerInterface {
     const trips: SearchTrainResponse = await res.json()
     return trips
   }
+}
 
-  private async book(input: {
-    segmentIds: string[]
-    folderId: string
-    searchId: string
-  }): Promise<BookResponse> {
-    if (!this.token) {
-      throw new Error('Not logged in')
-    }
+export default class TrainlineSearcherAndBooker extends TrainlineSearcher implements BookerInterface {
+  private interval: NodeJS.Timeout
+  protected travel: TravelEntity
+  private notifier: NotifierInterface
 
-    const options: Record<string, any> = {}
-    for (const sid of input.segmentIds) {
-      options[sid] = {
-        comfort_class: 'pao.default',
-        seat: 'no_preference', // TODO: set a preference when creating the booker
-      }
-    }
-    const res = await fetch(endpoint + '/book', {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        book: {
-          options: options,
-          outward_folder_id: input.folderId,
-          search_id: input.searchId,
-        }
-      } as BookRequest),
-    })
-    const book: BookResponse = await res.json()
-    this.logger(`book response:`, book)
-    return book
+  constructor(travel: TravelEntity, notifier: NotifierInterface, credentials: Credentials) {
+    super(travel, credentials)
+    this.travel = travel
+    this.notifier = notifier
+    this.logger = debug(`booker:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
+    this.logger(`Init booker`)
+
+    this.interval = setInterval(this.check.bind(this), 1000 * 60 * 30)
+    this.interval.unref()
+
+    this.check()
   }
 
-  private async payment(input: { pnrIds: string[] }) {
-    if (!this.token) {
-      throw new Error('Not logged in')
-    }
-
-    const res = await fetch(endpoint + '/payments', {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        payment: {
-          can_save_payment_card: false,
-          card_form_session: null,
-          cents: 0,
-          currency: 'EUR',
-          cvv_code: null,
-          device_data: null,
-          digitink_value: null,
-          expiration_month: null,
-          expiration_year: null,
-          holder: null,
-          is_new_customer: false,
-          mean: 'free',
-          nonce: null,
-          number: null,
-          order_id: null,
-          payment_card_id: null,
-          paypal_country: null,
-          paypal_email: null,
-          paypal_first_name: null,
-          paypal_last_name: null,
-          pnr_ids: input.pnrIds,
-          pro_save_card: false,
-          ravelin_device_id: null,
-          status: null,
-          verification_form: null,
-          verification_url: null,
-          wants_all_marketing: null
-        }
-      } as PaymentRequest),
-    })
-    const payment: PaymentResponse = await res.json()
-    this.logger(`payment response:`, payment)
-    return payment
+  async destroy () {
+    super.destroy()
+    clearInterval(this.interval)
   }
 
-  private async confirm(input: { paymentId: string, pnrIds: string[] }) {
-    if (!this.token) {
-      throw new Error('Not logged in')
+  private async check() {
+    if (this.travel.booked) {
+      this.logger('Already booked: ignore')
+      return
     }
 
-    const res = await fetch(endpoint + '/payments/' + input.paymentId + '/confirm', {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        payment: {
-          after_sales_charge_ids: [],
-          can_save_payment_card: false,
-          card_form_session: null,
-          cents: 0,
-          coupon_ids: [],
-          currency: 'EUR',
-          cvv_code: null,
-          device_data: null,
-          digitink_value: null,
-          exchange_ids: [],
-          expiration_month: null,
-          expiration_year: null,
-          holder: null,
-          is_new_customer: false,
-          mean: 'free',
-          nonce: null,
-          number: null,
-          order_id: null,
-          payment_card_id: null,
-          paypal_country: null,
-          paypal_email: null,
-          paypal_first_name: null,
-          paypal_last_name: null,
-          pnr_ids: input.pnrIds,
-          pro_save_card: false,
-          ravelin_device_id: null,
-          status: 'waiting_for_confirmation',
-          subscription_ids: [],
-          verification_form: null,
-          verification_url: null,
-          wants_all_marketing: null
-        }
-      } as ConfirmRequest)
-    })
-    const confirm: ConfirmResponse = await res.json()
-    this.logger(`confirm response:`, confirm)
-    return confirm
-  }
-
-  private async login() {
-    this.logger('login')
-    const res = await fetch(endpoint + '/account/signin', {
-      method: 'POST',
-      headers: {
-        ...headers,
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        id: 1,
-        email: this.credentials.username,
-        password: this.credentials.password,
-      } as LoginRequest)
-    })
-    let token: LoginResponse = await res.json()
-    this.token = token
-    this.token.passengers = token.passengers.filter(p => p.is_selected)
-    if (this.token.passengers.length > 1) {
-      this.notifier.send(`Il y a ${this.token.passengers.length} passagers sur ce compte Trainline, seulement le premier (${this.token.passengers[0].first_name}) sera utilise pour la reservation.`)
+    const trips = await this.list()
+    await this.notifier.send(this.formatMessageAvailable(trips))
+    if (!this.travel.book) {
+      return
     }
-  }
+    const trip = trips[0]
 
-  private async checkToken(): Promise<boolean> {
-    if (!this.token) {
-      return false
+    this.logger(`Book trip ${trip.id}`)
+    const confirmation = await TrainlineBooker.bookAndPay(
+      this.authentifier,
+      { segmentIds: trip.segment_ids, folderId: trip.folder_id, searchId: trip.searchId }
+    )
+    if (typeof confirmation === 'undefined') {
+      return
     }
 
-    const res = await fetch(endpoint + '/user', {
-      headers: {
-        ...headers,
-        'authorization': `Token token="${this.token.meta.token}"`,
-      }
-    })
-    return res.ok
+    this.logger(`Trip booked!`)
+    this.travel.booked = true
+    await this.travel.save()
+
+    await this.notifier.send(this.formatMessageBooked(trip, confirmation))
   }
 
-  private formatMessageAvailable (trips: SearchTrainResponse['trips']): string {
+  private formatMessageAvailable (trips: Awaited<ReturnType<TrainlineSearcher['list']>>): string {
     let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     trips.forEach((trip) => {
-      content += `\n- ${this.travel.from}-${this.travel.to}: ${getHourFromDate(new Date(trip.departure_date))}-${getHourFromDate(new Date(trip.arrival_date))}`
+      const formattedTrip = this.formatTrip(trip)
+      content += `\n- ${formattedTrip.fromFormatted}-${formattedTrip.toFormatted}: ${formattedTrip.formattedDepartureDate}-${formattedTrip.formattedArrivalDate}`
     })
     if (this.travel.book) {
       content += `\n\nUne reservation va etre tentee pour le premier train.`

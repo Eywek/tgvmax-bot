@@ -9,14 +9,14 @@ import BookerController from './src/controllers/booker.controller'
 import CronTravelController from './src/controllers/cronTravel.controller'
 import CronTravelEntity from './src/entities/cronTravel.entity'
 import { TrainlineStation } from './src/book/trainline'
-import * as telegram from './src/notify/telegram'
+import { TelegramNotifier } from './src/notify/telegram'
 
 const trainlineStations: TrainlineStation[] = require('./trainline_stations.json')
 
 const db = new Database()
 const app = express()
 db.connect().then(async () => {
-  telegram.start()
+  TelegramNotifier.start()
   await TravelEntity.deleteOld()
   const travels = await TravelEntity.find({ relations: ['notifier', 'booker', 'cron'] })
   travels.forEach(travel => travel.init())

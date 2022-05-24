@@ -19,12 +19,12 @@ export const getDate = (date: Date) => {
 
 
 export const getHumanDate = (date: Date) => {
-  return new Intl.DateTimeFormat([ config.dateFormat ], {
+  return new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Europe/Paris',
-    year: 'numeric',
-    month: 'numeric',
+    month: 'short',
+    weekday: 'short',
     day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(date)
 }
