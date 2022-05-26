@@ -1,5 +1,6 @@
 <template>
   <div id="app">
+    <SearchJourneys />
     <div class="flex flex-wrap mb-4">
       <div class="w-full md:w-1/2 p-0 md:p-10">
         <ListTravels/>
@@ -18,6 +19,7 @@ import ListTravels from './components/ListTravels'
 import ListCrons from './components/ListCrons'
 import ListBookers from './components/ListBookers'
 import ListNotifiers from './components/ListNotifiers'
+import SearchJourneys from './components/SearchJourneys.vue'
 
 export default {
   name: 'App',
@@ -25,8 +27,9 @@ export default {
     ListTravels,
     ListCrons,
     ListBookers,
-    ListNotifiers
-  },
+    ListNotifiers,
+    SearchJourneys
+},
   async mounted() {
     const travels = await fetch(`${process.env.API_URL}/travels`)
     this.$store.state.travels = await travels.json()

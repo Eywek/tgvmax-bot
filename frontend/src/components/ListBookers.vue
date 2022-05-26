@@ -18,13 +18,6 @@
         <div class="text-gray-700 text-base">
           {{ booker.name }} <i>via</i> {{ booker.type }}
           <button @click="deleteBooker(booker)" class="inline-block bg-red-700 rounded-full px-3 py-1 text-sm text-white mr-2 float-right">Supprimer</button>
-          <button
-            type="button"
-            class="inline-block bg-blue-500 hover:bg-blue-700 rounded-full px-3 py-1 text-sm text-white mr-2 float-right"
-            @click="showSearchModal(booker.id)"
-          >
-            Search a journey
-          </button>
           <div class="clearfix"></div>
         </div>
       </div>
@@ -34,24 +27,17 @@
       v-show="isModalVisible"
       @close="closeModal"
     />
-    <ModalSearchJourneys
-      v-show="isSearchModalVisible"
-      @close="closeSearchModal"
-      :bookerId="bookerId"
-    />
   </div>
 </template>
 
 <script>
 
 import ModalBooker from './ModalBooker.vue'
-import ModalSearchJourneys from './ModalSearchJourneys.vue'
 
 export default {
   name: "ListBookers",
   components: {
     ModalBooker,
-    ModalSearchJourneys,
   },
   data() {
     return {
@@ -71,14 +57,7 @@ export default {
     },
     closeModal() {
       this.isModalVisible = false
-    },
-    showSearchModal (bookerId) {
-      this.bookerId = bookerId
-      this.isSearchModalVisible = true
-    },
-    closeSearchModal() {
-      this.isSearchModalVisible = false
-    },
+    }
   }
 }
 </script>
