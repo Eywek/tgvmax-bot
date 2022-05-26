@@ -63,7 +63,7 @@ export default class TravelController {
     if (!req.body.searchId) return res.status(400).send({ msg: 'You need to provide a searchId.' })
     if (!req.body.bookerId) return res.status(400).send({ msg: 'You need to provide a bookerId.' })
 
-    const booker = await BookerEntity.findOne(String(req.query.bookerId))
+    const booker = await BookerEntity.findOne(String(req.body.bookerId))
     if (!booker) {
       return res.status(400).send({ msg: 'Unable to find the booker.' })
     }
