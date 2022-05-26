@@ -2,6 +2,7 @@ import TravelEntity from '../entities/travel.entity'
 import * as express from 'express'
 import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker } from '../book/trainline'
 import BookerEntity from '../entities/booker.entity'
+import { Readable, Transform } from 'stream'
 
 export default class TravelController {
 
@@ -51,10 +52,20 @@ export default class TravelController {
       date: new Date(String(req.query.date))
     }, { username: booker.username!, password: booker.password! })
 
-    const trips = await searcher.list()
-    searcher.destroy()
+    res.setHeader('Content-Type', 'application/ndjson; charset=utf-8')
+    const stream = Readable.from(searcher.getTrips(), { objectMode: true })
+    stream.on('end', () => searcher.destroy())
 
-    return res.send(trips.map(searcher.formatTrip))
+    stream
+      .pipe(
+        new Transform({
+          objectMode: true,
+          transform (trips: any[], encoding, next) {
+            this.push(trips.map(trip => JSON.stringify(searcher.formatTrip(trip))).join('\n'), encoding)
+            return next()
+          }
+        }))
+      .pipe(res)
   }
 
   static async bookJourney (req: express.Request, res: express.Response) {

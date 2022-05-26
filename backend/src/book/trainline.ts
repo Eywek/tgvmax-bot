@@ -480,21 +480,21 @@ export class TrainlineSearcher {
   async destroy () {}
 
   public async list () {
-    const tripsResult = await this.getTrips()
-    if (!tripsResult) {
-      return []
+    const trips: (SearchTrainResponse['trips'][number] & { searchId: string })[] = []
+    const iterator = this.getTrips()
+    for await (const foundTrips of iterator) {
+      trips.push(...foundTrips)
     }
-    const { trips, searchId } = tripsResult
     if (trips.length === 0) {
       this.logger('Got no trips')
       return []
     }
     this.logger(`Got ${trips.length} bookable trips`)
 
-    return trips.map(trip => Object.assign(trip, { searchId }))
+    return trips
   }
 
-  public formatTrip (trip: Awaited<ReturnType<TrainlineSearcher['list']>>[number]) {
+  public formatTrip (trip: SearchTrainResponse['trips'][number] & { searchId: string }) {
     return {
       from: trip.departure_station_id,
       fromFormatted: trainlineStations.find(s => s.trainlineId === trip.departure_station_id)!.name,
@@ -510,7 +510,7 @@ export class TrainlineSearcher {
     }
   }
 
-  private async getTrips(): Promise<{ trips: SearchTrainResponse['trips']; searchId: string } | undefined> {
+  public getTrips(): AsyncIterable<(SearchTrainResponse['trips'][number] & { searchId: string })[]> {
     const minDate = new Date(this.travel.date)
     minDate.setHours(this.travel.minHour ?? 0)
     minDate.setMinutes(this.travel.minMinute ?? 0, 0)
@@ -518,45 +518,64 @@ export class TrainlineSearcher {
     maxDate.setHours(this.travel.maxHour ?? 23)
     maxDate.setMinutes(this.travel.maxMinute ?? 59, 59)
 
-    const bookableTrips: SearchTrainResponse['trips'] = []
-    
+    const seenTrips: Set<string> = new Set()
     this.logger('search')
-    const trips = await this.search({
-      departure: minDate,
-      departureStationId: this.departureId,
-      arrivalStationId: this.arrivalId,
-    })
-    if (!trips.trips) {
-      this.logger('Response has no trips', trips)
-      return
-    }
 
-    const { trips: filteredTrips, lastDate: ld } = this.filterTrips(trips.trips)
-    for (const trip of filteredTrips) {
-      bookableTrips.push(trip)
-    }
-    let lastDate: Date | undefined = ld
-    while (lastDate && lastDate.getTime() < maxDate.getTime()) {
-      this.logger(`search next, current date=${lastDate.toISOString()}`)
-      const { trips: nextTrips, lastDate: nextLastDate } = this.filterTrips((await this.searchNext(trips.search.id)).trips)
-      for (const trip of nextTrips) {
-        bookableTrips.push(trip)
-      }
-      if (nextLastDate?.getTime() === lastDate.getTime()) {
-        break
-      }
-      lastDate = nextLastDate
-    }
-
+    const searcher = this
+    let trips: SearchTrainResponse
+    let lastDate: Date | undefined
     return {
-      trips: bookableTrips.filter((a, i, trips) => {
-        // deduplicate travels
-        const tripIndex = trips.findIndex((b) => (a.departure_date === b.departure_date && a.arrival_date === b.arrival_date))
-        if (tripIndex === i) {
-          return true
+      [Symbol.asyncIterator]: () => ({
+        async next () {
+          if (typeof trips === 'undefined') {
+            trips = await searcher.search({
+              departure: minDate,
+              departureStationId: searcher.departureId,
+              arrivalStationId: searcher.arrivalId,
+            })
+            if (!trips.trips) {
+              searcher.logger('Response has no trips', trips)
+              return { value: [], done: true as true }
+            }
+            const { trips: filteredTrips, lastDate: ld } = searcher.filterTrips(trips.trips)
+            for (const trip of filteredTrips) {
+              seenTrips.add(trip.id)
+            }
+            lastDate = ld
+            return {
+              value: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+              done: false
+            }
+          }
+          if (typeof lastDate === 'undefined' || lastDate.getTime() >= maxDate.getTime()) {
+            // note: when sending done: true, value is ignored
+            return {
+              value: [],
+              done: true
+            }
+          }
+      
+          searcher.logger(`search next, current date=${lastDate.toISOString()}`)
+          const { trips: nextTrips, lastDate: nextLastDate } = searcher.filterTrips((await searcher.searchNext(trips.search.id)).trips)
+          const filteredTrips = nextTrips.filter(trip => seenTrips.has(trip.id) === false) // remove duplicates
+          for (const trip of nextTrips) {
+            seenTrips.add(trip.id)
+          }
+          if (nextLastDate?.getTime() === lastDate.getTime()) {
+            // note: when sending done: true, value is ignored
+            return {
+              value: [],
+              done: true
+            }
+          }
+          lastDate = nextLastDate
+  
+          return {
+            value: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+            done: false
+          }
         }
-      }),
-      searchId: trips.search.id,
+      })
     }
   }
 
@@ -707,7 +726,7 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
     await this.notifier.send(this.formatMessageBooked(trip, confirmation))
   }
 
-  private formatMessageAvailable (trips: Awaited<ReturnType<TrainlineSearcher['list']>>): string {
+  private formatMessageAvailable (trips: (SearchTrainResponse['trips'][number] & { searchId: string })[]): string {
     let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     trips.forEach((trip) => {
       const formattedTrip = this.formatTrip(trip)
