@@ -18,7 +18,7 @@
         <p>Sorry, we found nothing!</p>
       </div>
 
-      <div v-if="!loading && journeys !== null && journeys.length >= 1">
+      <div v-if="journeys !== null && journeys.length >= 1">
         <table class="table-auto w-full mb-4">
           <tbody class="">
             <tr v-for="journey in journeys" v-bind:key="journey.book.folderId" class="p-4">
@@ -35,7 +35,7 @@
             </tr>
           </tbody>
         </table>
-        
+
       </div>
 
       <form v-if="!loading && journeys === null">
@@ -120,7 +120,7 @@
       },
       async search () {
         this.loading = true
-        this.journeys = null
+        this.journeys = []
         const result = await fetch(
           `${process.env.API_URL}/travels/journeys?${new URLSearchParams({
             from: this.from,
@@ -130,8 +130,15 @@
           })}
           `
         )
+        const decoder = new TextDecoder()
+        const reader = result.body.getReader()
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          const trips = decoder.decode(value).split('\n').map(trip => JSON.parse(trip))
+          this.journeys.push(...trips)
+        }
         this.loading = false
-        this.journeys = await result.json()
       },
       async book (journey) {
         if (!confirm('Are you sure to book this journey?')) {
