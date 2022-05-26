@@ -1,11 +1,11 @@
 <template>
   <div id="app">
     <div class="flex flex-wrap mb-4">
-      <div class="w-full md:w-1/2 p-10">
+      <div class="w-full md:w-1/2 p-0 md:p-10">
         <ListTravels/>
         <ListCrons />
       </div>
-      <div class="w-full md:w-1/2 p-10">
+      <div class="w-full md:w-1/2 p-0 md:p-10">
         <ListBookers/>
         <ListNotifiers/>
       </div>
