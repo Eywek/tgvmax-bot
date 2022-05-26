@@ -3,6 +3,9 @@ import * as express from 'express'
 import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker } from '../book/trainline'
 import BookerEntity from '../entities/booker.entity'
 import { Readable, Transform } from 'stream'
+import { getHumanDate } from '../utils/date'
+
+type AsyncIteratorResult<T> = T extends AsyncIterable<infer U> ? U : T
 
 export default class TravelController {
 
@@ -60,8 +63,14 @@ export default class TravelController {
       .pipe(
         new Transform({
           objectMode: true,
-          transform (trips: any[], encoding, next) {
-            this.push(trips.map(trip => JSON.stringify(searcher.formatTrip(trip))).join('\n'), encoding)
+          transform ({ trips, lastDate }: AsyncIteratorResult<ReturnType<TrainlineSearcher['getTrips']>>, encoding, next) {
+            this.push(
+              JSON.stringify({
+                trips: trips.map(trip => searcher.formatTrip(trip)),
+                lastDate: getHumanDate(lastDate)
+              }) + '\n',
+              encoding
+            )
             return next()
           }
         }))

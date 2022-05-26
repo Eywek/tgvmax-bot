@@ -18,6 +18,10 @@
         <p>Sorry, we found nothing!</p>
       </div>
 
+      <div v-if="loading === true && lastDateSearched !== null">
+        Last date searched: {{ lastDateSearched }}
+      </div>
+
       <div v-if="journeys !== null && journeys.length >= 1">
         <table class="table-auto w-full mb-4">
           <tbody class="">
@@ -104,6 +108,7 @@
         to: null,
         loading: false,
         journeys: null,
+        lastDateSearched: null,
         date: new Date(),
         autocompleteEndpoint: `${process.env.API_URL}/stations/autocomplete?searchTerm=`
       }
@@ -121,6 +126,7 @@
       async search () {
         this.loading = true
         this.journeys = []
+        this.lastDateSearched = null
         const result = await fetch(
           `${process.env.API_URL}/travels/journeys?${new URLSearchParams({
             from: this.from,
@@ -135,8 +141,9 @@
         while (true) {
           const { value, done } = await reader.read()
           if (done) break
-          const trips = decoder.decode(value).split('\n').map(trip => JSON.parse(trip))
-          this.journeys.push(...trips)
+          const search = JSON.parse(decoder.decode(value))
+          this.journeys.push(...search.trips)
+          this.lastDateSearched = search.lastDate
         }
         this.loading = false
       },

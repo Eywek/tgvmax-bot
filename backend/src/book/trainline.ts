@@ -242,6 +242,8 @@ type PNRsResponse = {
   }[]
 }
 
+type Trip = SearchTrainResponse['trips'][number] & { searchId: string }
+
 export class TrainlineAuthentifier {
   protected credentials: Credentials
   protected token?: LoginResponse
@@ -480,9 +482,9 @@ export class TrainlineSearcher {
   async destroy () {}
 
   public async list () {
-    const trips: (SearchTrainResponse['trips'][number] & { searchId: string })[] = []
+    const trips: (Trip)[] = []
     const iterator = this.getTrips()
-    for await (const foundTrips of iterator) {
+    for await (const { trips: foundTrips } of iterator) {
       trips.push(...foundTrips)
     }
     if (trips.length === 0) {
@@ -494,7 +496,7 @@ export class TrainlineSearcher {
     return trips
   }
 
-  public formatTrip (trip: SearchTrainResponse['trips'][number] & { searchId: string }) {
+  public formatTrip (trip: Trip) {
     return {
       from: trip.departure_station_id,
       fromFormatted: trainlineStations.find(s => s.trainlineId === trip.departure_station_id)!.name,
@@ -510,7 +512,7 @@ export class TrainlineSearcher {
     }
   }
 
-  public getTrips(): AsyncIterable<(SearchTrainResponse['trips'][number] & { searchId: string })[]> {
+  public getTrips(): AsyncIterable<{ trips: Trip[], lastDate: Date }> {
     const minDate = new Date(this.travel.date)
     minDate.setHours(this.travel.minHour ?? 0)
     minDate.setMinutes(this.travel.minMinute ?? 0, 0)
@@ -535,7 +537,13 @@ export class TrainlineSearcher {
             })
             if (!trips.trips) {
               searcher.logger('Response has no trips', trips)
-              return { value: [], done: true as true }
+              return {
+                value: {
+                  trips: [],
+                  lastDate: lastDate ?? maxDate
+                },
+                done: true as true
+              }
             }
             const { trips: filteredTrips, lastDate: ld } = searcher.filterTrips(trips.trips)
             for (const trip of filteredTrips) {
@@ -543,14 +551,20 @@ export class TrainlineSearcher {
             }
             lastDate = ld
             return {
-              value: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+              value: {
+                trips: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+                lastDate: lastDate ?? maxDate
+              },
               done: false
             }
           }
           if (typeof lastDate === 'undefined' || lastDate.getTime() >= maxDate.getTime()) {
             // note: when sending done: true, value is ignored
             return {
-              value: [],
+              value: {
+                trips: [],
+                lastDate: lastDate ?? maxDate
+              },
               done: true
             }
           }
@@ -564,14 +578,20 @@ export class TrainlineSearcher {
           if (nextLastDate?.getTime() === lastDate.getTime()) {
             // note: when sending done: true, value is ignored
             return {
-              value: [],
+              value: {
+                trips: [],
+                lastDate: nextLastDate
+              },
               done: true
             }
           }
           lastDate = nextLastDate
   
           return {
-            value: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+            value: {
+              trips: filteredTrips.map(trip => Object.assign(trip, { searchId: trips.search.id })),
+              lastDate: lastDate ?? maxDate
+            },
             done: false
           }
         }
@@ -726,7 +746,7 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
     await this.notifier.send(this.formatMessageBooked(trip, confirmation))
   }
 
-  private formatMessageAvailable (trips: (SearchTrainResponse['trips'][number] & { searchId: string })[]): string {
+  private formatMessageAvailable (trips: (Trip)[]): string {
     let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     trips.forEach((trip) => {
       const formattedTrip = this.formatTrip(trip)
