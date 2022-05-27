@@ -203,7 +203,8 @@ export default {
           book: this.book
         })
       })
-      this.$store.state.travels.push(await res.json())
+      const travels = await fetch(`${process.env.API_URL}/travels`)
+      this.$store.state.travels = await travels.json()
       this.$emit('close')
     },
     close() {

@@ -2,11 +2,11 @@
   <div id="app">
     <SearchJourneys />
     <div class="flex flex-wrap mb-4">
-      <div class="w-full md:w-1/2 p-0 md:p-10">
+      <div class="w-full md:w-2/3 p-0 md:p-10 md:pr-5">
         <ListTravels/>
         <ListCrons />
       </div>
-      <div class="w-full md:w-1/2 p-0 md:p-10">
+      <div class="w-full md:w-1/3 p-0 md:p-10 md:pl-5">
         <ListBookers/>
         <ListNotifiers/>
       </div>

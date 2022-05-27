@@ -6,6 +6,9 @@ import { getDate, getHourFromDate, getHumanDate } from '../utils/date'
 import debug from 'debug'
 
 const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
+
+export { trainlineStations }
+
 export interface TrainlineStation {
   trainlineId: string
   sncfId: string
