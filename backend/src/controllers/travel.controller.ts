@@ -2,6 +2,10 @@ import TravelEntity from '../entities/travel.entity'
 import * as express from 'express'
 import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker } from '../book/trainline'
 import BookerEntity from '../entities/booker.entity'
+import { Readable, Transform } from 'stream'
+import { getHumanDate } from '../utils/date'
+
+type AsyncIteratorResult<T> = T extends AsyncIterable<infer U> ? U : T
 
 export default class TravelController {
 
@@ -51,10 +55,26 @@ export default class TravelController {
       date: new Date(String(req.query.date))
     }, { username: booker.username!, password: booker.password! })
 
-    const trips = await searcher.list()
-    searcher.destroy()
+    res.setHeader('Content-Type', 'application/ndjson; charset=utf-8')
+    const stream = Readable.from(searcher.getTrips(), { objectMode: true })
+    stream.on('end', () => searcher.destroy())
 
-    return res.send(trips.map(searcher.formatTrip))
+    stream
+      .pipe(
+        new Transform({
+          objectMode: true,
+          transform ({ trips, lastDate }: AsyncIteratorResult<ReturnType<TrainlineSearcher['getTrips']>>, encoding, next) {
+            this.push(
+              JSON.stringify({
+                trips: trips.map(trip => searcher.formatTrip(trip)),
+                lastDate: getHumanDate(lastDate)
+              }) + '\n',
+              encoding
+            )
+            return next()
+          }
+        }))
+      .pipe(res)
   }
 
   static async bookJourney (req: express.Request, res: express.Response) {

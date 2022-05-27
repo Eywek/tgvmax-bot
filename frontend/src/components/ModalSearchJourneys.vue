@@ -18,7 +18,11 @@
         <p>Sorry, we found nothing!</p>
       </div>
 
-      <div v-if="!loading && journeys !== null && journeys.length >= 1">
+      <div v-if="loading === true && lastDateSearched !== null">
+        Last date searched: {{ lastDateSearched }}
+      </div>
+
+      <div v-if="journeys !== null && journeys.length >= 1">
         <table class="table-auto w-full mb-4">
           <tbody class="">
             <tr v-for="journey in journeys" v-bind:key="journey.book.folderId" class="p-4">
@@ -35,7 +39,7 @@
             </tr>
           </tbody>
         </table>
-        
+
       </div>
 
       <form v-if="!loading && journeys === null">
@@ -104,6 +108,7 @@
         to: null,
         loading: false,
         journeys: null,
+        lastDateSearched: null,
         date: new Date(),
         autocompleteEndpoint: `${process.env.API_URL}/stations/autocomplete?searchTerm=`
       }
@@ -120,7 +125,8 @@
       },
       async search () {
         this.loading = true
-        this.journeys = null
+        this.journeys = []
+        this.lastDateSearched = null
         const result = await fetch(
           `${process.env.API_URL}/travels/journeys?${new URLSearchParams({
             from: this.from,
@@ -130,8 +136,16 @@
           })}
           `
         )
+        const decoder = new TextDecoder()
+        const reader = result.body.getReader()
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          const search = JSON.parse(decoder.decode(value))
+          this.journeys.push(...search.trips)
+          this.lastDateSearched = search.lastDate
+        }
         this.loading = false
-        this.journeys = await result.json()
       },
       async book (journey) {
         if (!confirm('Are you sure to book this journey?')) {
