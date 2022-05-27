@@ -26,9 +26,19 @@
             </autocomplete>
           </div>
           <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2" for="date">Date</label>
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="date">Date minimum</label>
             <v-date-picker
               v-model='date'
+              :input-props='{
+                class: "shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none z-10",
+                placeholder: "Date"
+              }'
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="date">Date maximum</label>
+            <v-date-picker
+              v-model='untilDate'
               :input-props='{
                 class: "shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none z-10",
                 placeholder: "Date"
@@ -162,7 +172,13 @@
         lastDateSearched: null,
         bookLoading: false,
         date: new Date(),
+        untilDate: new Date(),
         autocompleteEndpoint: `${process.env.API_URL}/stations/autocomplete?searchTerm=`
+      }
+    },
+    watch: {
+      date (value) {
+        this.untilDate = value
       }
     },
     methods: {
@@ -179,14 +195,17 @@
         this.loading = true
         this.journeys = []
         this.lastDateSearched = null
+        const params = {
+          from: this.from,
+          to: this.to,
+          date: this.date.toLocaleDateString('sv'),
+          bookerId: this.booker,
+        }
+        if (this.untilDate.toISOString() !== this.date.toISOString()) {
+          params.untilDate = this.untilDate.toLocaleDateString('sv')
+        }
         const result = await fetch(
-          `${process.env.API_URL}/travels/journeys?${new URLSearchParams({
-            from: this.from,
-            to: this.to,
-            date: this.date.toLocaleDateString('sv'),
-            bookerId: this.booker,
-          })}
-          `
+          `${process.env.API_URL}/travels/journeys?${new URLSearchParams(params)}`
         )
         const decoder = new TextDecoder()
         const reader = result.body.getReader()

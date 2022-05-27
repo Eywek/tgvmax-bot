@@ -56,7 +56,8 @@ export default class TravelController {
     }, { username: booker.username!, password: booker.password! })
 
     res.setHeader('Content-Type', 'application/ndjson; charset=utf-8')
-    const stream = Readable.from(searcher.getTrips(), { objectMode: true })
+    const iterable = searcher.getTrips(typeof req.query.untilDate === 'string' ? new Date(req.query.untilDate) : undefined)
+    const stream = Readable.from(iterable, { objectMode: true })
     stream.on('end', () => searcher.destroy())
 
     stream
