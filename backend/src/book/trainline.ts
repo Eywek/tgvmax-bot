@@ -6,6 +6,9 @@ import { getDate, getHourFromDate, getHumanDate } from '../utils/date'
 import debug from 'debug'
 
 const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
+
+export { trainlineStations }
+
 export interface TrainlineStation {
   trainlineId: string
   sncfId: string
@@ -512,16 +515,20 @@ export class TrainlineSearcher {
     }
   }
 
-  public getTrips(): AsyncIterable<{ trips: Trip[], lastDate: Date }> {
+  public getTrips(maxDate: Date = new Date(this.travel.date)): AsyncIterable<{ trips: Trip[], lastDate: Date }> {
     const minDate = new Date(this.travel.date)
     minDate.setHours(this.travel.minHour ?? 0)
     minDate.setMinutes(this.travel.minMinute ?? 0, 0)
-    const maxDate = new Date(this.travel.date)
     maxDate.setHours(this.travel.maxHour ?? 23)
-    maxDate.setMinutes(this.travel.maxMinute ?? 59, 59)
+    maxDate.setMinutes(this.travel.maxMinute ?? (this.travel.maxHour ? 0 : 59), 59)
+    const searchRequest = {
+      departure: minDate,
+      departureStationId: this.departureId,
+      arrivalStationId: this.arrivalId,
+    }
 
     const seenTrips: Set<string> = new Set()
-    this.logger('search')
+    this.logger(`search, date=${minDate.toISOString()}, untilDate=${maxDate.toISOString()}`)
 
     const searcher = this
     let trips: SearchTrainResponse
@@ -530,11 +537,7 @@ export class TrainlineSearcher {
       [Symbol.asyncIterator]: () => ({
         async next () {
           if (typeof trips === 'undefined') {
-            trips = await searcher.search({
-              departure: minDate,
-              departureStationId: searcher.departureId,
-              arrivalStationId: searcher.arrivalId,
-            })
+            trips = await searcher.search(searchRequest)
             if (!trips.trips) {
               searcher.logger('Response has no trips', trips)
               return {
@@ -558,6 +561,7 @@ export class TrainlineSearcher {
               done: false
             }
           }
+          searcher.logger(`search next, current date=${lastDate?.toISOString()}`)
           if (typeof lastDate === 'undefined' || lastDate.getTime() >= maxDate.getTime()) {
             // note: when sending done: true, value is ignored
             return {
@@ -569,21 +573,12 @@ export class TrainlineSearcher {
             }
           }
       
-          searcher.logger(`search next, current date=${lastDate.toISOString()}`)
-          const { trips: nextTrips, lastDate: nextLastDate } = searcher.filterTrips((await searcher.searchNext(trips.search.id)).trips)
+          const result = await searcher.searchNext(Object.assign(trips.search, searchRequest, { currentDate: lastDate }))
+          trips.search = result.search // in case of new search being launched
+          const { trips: nextTrips, lastDate: nextLastDate } = searcher.filterTrips(result.trips)
           const filteredTrips = nextTrips.filter(trip => seenTrips.has(trip.id) === false) // remove duplicates
           for (const trip of nextTrips) {
             seenTrips.add(trip.id)
-          }
-          if (nextLastDate?.getTime() === lastDate.getTime()) {
-            // note: when sending done: true, value is ignored
-            return {
-              value: {
-                trips: [],
-                lastDate: nextLastDate
-              },
-              done: true
-            }
           }
           lastDate = nextLastDate
   
@@ -678,8 +673,17 @@ export class TrainlineSearcher {
     return trips
   }
 
-  private async searchNext(searchId: string) {
-    const res = await this.authentifier.request(endpoint + '/search/' + searchId + '/next', {
+  private async searchNext(search: SearchTrainResponse['search'] & {
+    currentDate: Date
+    departure: Date
+    departureStationId: string,
+    arrivalStationId: string
+  }) {
+    if (search.is_next_available === false) {
+      this.logger(`Search next is unavailable, launch new search with date=${search.currentDate.toISOString()}`)
+      return await this.search(Object.assign({}, search, { departure: search.currentDate }))
+    }
+    const res = await this.authentifier.request(endpoint + '/search/' + search.id + '/next', {
       method: 'GET',
       headers: {
         accept: 'application/json, text/javascript, */*; q=0.01',

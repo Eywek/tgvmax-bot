@@ -13,39 +13,66 @@
     <div v-if="this.$store.state.travels.length === 0" class="flex justify-center items-center">
       <img src="../assets/benoit.png" class="rounded-full">
     </div>
-    <div class="rounded overflow-hidden border-r border-b border-l border-t border-gray-400 mb-4" v-for="travel in this.$store.state.travels" v-bind:key="travel.id">
-      <div class="px-6 py-4">
-        <div class="font-bold text-xl">
-          {{ travel.from }} → {{ travel.to }}
-          <div class="text-gray-500 float-right text-base font-normal">
-            {{ new Intl.DateTimeFormat('sv', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date(travel.date)) }}
-            <span v-if="travel.minHour">
-              <span v-if="!travel.maxHour">≥</span>
-              {{ travel.minHour }}h<span v-if="travel.minMinute">{{ travel.minMinute }}</span>
-            </span>
-            <span v-if="travel.minHour && travel.maxHour">-</span>
-            <span v-if="travel.maxHour">
-              <span v-if="!travel.minHour">≤</span>
-              {{ travel.maxHour }}h<span v-if="travel.maxMinute">{{ travel.maxMinute }}</span>
-            </span>
+
+    <div class="flex flex-col" v-if="this.$store.state.travels.length > 0">
+      <div class="overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="py-4 inline-block min-w-full sm:px-6 lg:px-8">
+          <div class="overflow-hidden">
+            <table class="min-w-full text-center">
+              <thead class="border-b bg-gray-200">
+                <tr>
+                  <th scope="col" class="text-sm font-medium text-gray-900 px-6 py-4">
+                    Qui
+                  </th>
+                  <th scope="col" class="text-sm font-medium text-gray-900 px-6 py-4">
+                    Trajet
+                  </th>
+                  <th scope="col" class="text-sm font-medium text-gray-900 px-6 py-4">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  class="bg-white border-b"
+                  v-for="travel in this.$store.state.travels" v-bind:key="travel.id"
+                >
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span v-if="travel.book" class="font-medium">{{ travel.booker.name }}</span>
+                    <span v-if="!travel.book" class="font-medium">{{ travel.notifier.name }}</span>
+                    <span class="font-light">
+                      via <span class="italic">{{ travel.notifier.type }}</span>
+                      <span v-if="travel.book">& <span class="italic">{{ travel.booker.type }}</span></span>
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="font-medium">{{ travel.fromFormatted }}</span> → <span class="font-medium">{{ travel.toFormatted }}</span><br>
+                    <span class="font-light">
+                      {{ travel.departureDate }}
+                      <span v-if="travel.minHour && !travel.maxHour">
+                        après {{ travel.minHour }}h<span v-if="travel.minMinute">{{ travel.minMinute }}</span>
+                      </span>
+                      <span v-if="!travel.minHour && travel.maxHour">
+                        avant {{ travel.maxHour }}h<span v-if="travel.maxMinute">{{ travel.maxMinute }}</span>
+                      </span>
+                      <span v-if="travel.minHour && travel.maxHour">
+                        entre
+                        {{ travel.minHour }}h<span v-if="travel.minMinute">{{ travel.minMinute }}</span>
+                        et
+                        {{ travel.maxHour }}h<span v-if="travel.maxMinute">{{ travel.maxMinute }}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td class="text-sm text-gray-900 font-light px-6 py-4 whitespace-nowrap flex justify-center items-center">
+                    <button @click="deleteTravel(travel)" class="inline-block bg-red-700 rounded-full px-3 py-1 text-sm text-white mr-2 float-right">Supprimer</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <p class="text-gray-700 text-base" v-if="!travel.booked">
-          Le train sera vérifié <span v-if="travel.book">et reservé </span>avec {{ travel.booker.type }} ({{ travel.booker.name }})
-        </p>
-        <p class="text-gray-700 text-base" v-if="travel.booked">
-          Le train a été reservé avec {{ travel.booker.type }} ({{ travel.booker.name }})
-        </p>
-        <p class="text-gray-700 text-base">
-          Vous serez notifié via {{ travel.notifier.type }} ({{ travel.notifier.name }})
-        </p>
-      </div>
-      <div class="px-6 pb-4">
-        <button @click="deleteTravel(travel)" class="inline-block bg-red-700 rounded-full px-3 py-1 text-sm text-white mr-2 float-right">Supprimer</button>
-        <div class="clearfix"></div>
       </div>
     </div>
-
     <ModalTravel
       v-show="isModalVisible"
       @close="closeModal"

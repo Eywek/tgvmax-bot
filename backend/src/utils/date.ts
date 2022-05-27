@@ -18,13 +18,13 @@ export const getDate = (date: Date) => {
 }
 
 
-export const getHumanDate = (date: Date) => {
+export const getHumanDate = (date: Date, withHour = true) => {
   return new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Europe/Paris',
     month: 'short',
     weekday: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: withHour ? '2-digit' : undefined,
+    minute: withHour ? '2-digit' : undefined,
   }).format(date)
 }

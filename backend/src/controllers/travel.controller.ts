@@ -1,6 +1,6 @@
 import TravelEntity from '../entities/travel.entity'
 import * as express from 'express'
-import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker } from '../book/trainline'
+import { TrainlineAuthentifier, TrainlineSearcher, TrainlineBooker, trainlineStations } from '../book/trainline'
 import BookerEntity from '../entities/booker.entity'
 import { Readable, Transform } from 'stream'
 import { getHumanDate } from '../utils/date'
@@ -21,7 +21,14 @@ export default class TravelController {
 
   static async list (req: express.Request, res: express.Response) {
     const travels = await TravelEntity.find({ relations: ['notifier', 'booker', 'cron'] })
-    return res.send(travels)
+    return res.send(
+      travels.map(travel => Object.assign(travel, {
+        fromFormatted: trainlineStations.find(s => s.sncfId === travel.from)!.name,
+        toFormatted: trainlineStations.find(s => s.sncfId === travel.to)!.name,
+        departureDate: getHumanDate(new Date(travel.date), false)
+      }))
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+    )
   }
 
   static async create (req: express.Request, res: express.Response) {
@@ -56,7 +63,8 @@ export default class TravelController {
     }, { username: booker.username!, password: booker.password! })
 
     res.setHeader('Content-Type', 'application/ndjson; charset=utf-8')
-    const stream = Readable.from(searcher.getTrips(), { objectMode: true })
+    const iterable = searcher.getTrips(typeof req.query.untilDate === 'string' ? new Date(req.query.untilDate) : undefined)
+    const stream = Readable.from(iterable, { objectMode: true })
     stream.on('end', () => searcher.destroy())
 
     stream
