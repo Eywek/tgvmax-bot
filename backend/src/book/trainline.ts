@@ -2,7 +2,7 @@ import { BookerInterface, Credentials } from './interface'
 import fetch, { RequestInit } from 'node-fetch'
 import TravelEntity from '../entities/travel.entity'
 import { NotifierInterface } from '../notify/interface'
-import { getDate, getHourFromDate, getHumanDate } from '../utils/date'
+import { getDate, getHourFromDate, getHumanDate, getTimezoneOffset } from '../utils/date'
 import debug from 'debug'
 
 const trainlineStations: TrainlineStation[] = require('../../trainline_stations.json')
@@ -528,10 +528,11 @@ export class TrainlineSearcher {
 
   public getTrips(maxDate: Date = new Date(this.travel.date)): AsyncIterable<{ trips: Trip[], lastDate: Date }> {
     const minDate = new Date(this.travel.date)
-    minDate.setHours(this.travel.minHour ?? 0)
-    minDate.setMinutes(this.travel.minMinute ?? 0, 0)
-    maxDate.setHours(this.travel.maxHour ?? 23)
-    maxDate.setMinutes(this.travel.maxMinute ?? (this.travel.maxHour ? 0 : 59), 59)
+    // i.e GMT+02 = offset will be -120, so for 11h we will set 9h UTC
+    minDate.setUTCHours((this.travel.minHour ?? 0) + (getTimezoneOffset('Europe/Paris') / 60))
+    minDate.setUTCMinutes(this.travel.minMinute ?? 0, 0)
+    maxDate.setUTCHours((this.travel.maxHour ?? 23) + (getTimezoneOffset('Europe/Paris') / 60))
+    maxDate.setUTCMinutes(this.travel.maxMinute ?? (this.travel.maxHour ? 0 : 59), (this.travel.maxHour ? 0 : 59))
     const searchRequest = {
       departure: minDate,
       departureStationId: this.departureId,

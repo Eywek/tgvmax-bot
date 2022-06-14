@@ -17,6 +17,14 @@ export const getDate = (date: Date) => {
   }).format(date)
 }
 
+export function getTimezoneOffset(tz: string) {
+  const date = new Date()
+  // '2022-06-14 17:22:29' -> 
+  const [year, month, day, hour, minute, seconds] = date.toLocaleString('sv', { timeZone: tz }).split(/-| |:/)
+  const t1 = Date.UTC(+year, +month - 1, +day, +hour, +minute, +seconds)
+  const t2 = new Date(date).setMilliseconds(0)
+  return (t2 - t1) / 60 / 1000;
+}
 
 export const getHumanDate = (date: Date, withHour = true) => {
   return new Intl.DateTimeFormat('fr-FR', {
