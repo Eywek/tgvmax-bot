@@ -59,7 +59,7 @@ export default class TravelEntity extends BaseEntity {
     if (!this.notifier || !this.booker) {
       throw new Error(`No booker or notifier for travel ${this.id}`)
     }
-    logger(`Init booker for ${this.id} (${this.from}-${this.to}_${this.date}) (notifier: '${this.notifier.name}')`)
+    logger(`Init booker for ${this.id} (${this.from}-${this.to}_${this.date.toISOString()}) (notifier: '${this.notifier.name}')`)
     bookers.set(this.id, this.booker.init(this, this.notifier.init()))
   }
 
