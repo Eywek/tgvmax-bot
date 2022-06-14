@@ -724,6 +724,13 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
       return
     }
 
+    const msBetweenNowAndTravel = new Date(this.travel.date).getTime() - new Date().getTime()
+    const daysBetweenNowAndTravel = msBetweenNowAndTravel / 1000 / 60 / 60 / 24
+    if (daysBetweenNowAndTravel > 30) {
+      this.logger(`Trip in more than 30 days (${daysBetweenNowAndTravel} days): ignore`)
+      return
+    }
+
     const trips = await this.list()
     if (trips.length === 0) {
       return
