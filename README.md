@@ -53,14 +53,15 @@ upstream backend {
 }
 
 server {
-	server_name mydomain.fr;
+    server_name mydomain.fr;
 
     location / {
         include proxy_params;
         proxy_pass http://frontend;
     }
-	location /api {
+    location /api {
         include proxy_params;
+	proxy_buffering off;
         proxy_pass http://backend;
     }
 }
