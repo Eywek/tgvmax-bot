@@ -608,31 +608,38 @@ export class TrainlineSearcher {
   }
 
   private filterTrips(trips: SearchTrainResponse['trips'], minDate: Date, maxDate: Date): { trips: SearchTrainResponse['trips']; lastDate?: Date } {
-    this.logger(`got ${trips.length} trips for the request`)
+    
+    if(trips)
+    {
+      this.logger(`got ${trips} trips for the request`)
 
-    trips = trips.sort((a, b) => a.departure_date.localeCompare(b.departure_date))
-    const bookableTrips = trips
-      .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
-      .filter((trip) => {
-        // sometimes trainline returns trains that doesn't respect the request
-        const date = new Date(trip.departure_date)
-        return date.getTime() >= minDate.getTime() && date.getTime() <= maxDate.getTime()
-      })
-    if (bookableTrips.length === 0) {
-      this.logger('No bookable trip')
-      return {
-        trips: [],
-        lastDate: trips.length > 0 ? new Date(trips[trips.length - 1].departure_date) : undefined,
+      trips = trips.sort((a, b) => a.departure_date.localeCompare(b.departure_date))
+      const bookableTrips = trips
+        .filter(trip => trip.cents === 0 && trip.long_unsellable_reason === undefined) // filter only tgv max trips
+        .filter((trip) => {
+          // sometimes trainline returns trains that doesn't respect the request
+          const date = new Date(trip.departure_date)
+          return date.getTime() >= minDate.getTime() && date.getTime() <= maxDate.getTime()
+        })
+
+      if(bookableTrips.length > 0)
+      {
+        // Remove duplicates for this search
+        const deduplicatedBookableTrips = bookableTrips.reduce((deduplicatedBookableTrips, trip) => {
+          deduplicatedBookableTrips.set(this.uniqueIdForTrip(trip), trip)
+          return deduplicatedBookableTrips
+        }, new Map<string, typeof bookableTrips[number]>())
+        this.logger(`Found ${bookableTrips.length} trips`)
+        return {
+          trips: Array.from(deduplicatedBookableTrips.values()),
+          lastDate: trips.length > 0 ? new Date(trips[trips.length - 1].departure_date) : undefined,
+        }
       }
     }
-    // Remove duplicates for this search
-    const deduplicatedBookableTrips = bookableTrips.reduce((deduplicatedBookableTrips, trip) => {
-      deduplicatedBookableTrips.set(this.uniqueIdForTrip(trip), trip)
-      return deduplicatedBookableTrips
-    }, new Map<string, typeof bookableTrips[number]>())
-    this.logger(`Found ${bookableTrips.length} trips`)
+    
+    this.logger('No bookable trip')
     return {
-      trips: Array.from(deduplicatedBookableTrips.values()),
+      trips: [],
       lastDate: trips.length > 0 ? new Date(trips[trips.length - 1].departure_date) : undefined,
     }
   }
