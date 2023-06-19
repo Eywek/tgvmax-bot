@@ -8,6 +8,7 @@ import { getHumanDate } from '../utils/date'
 type AsyncIteratorResult<T> = T extends AsyncIterable<infer U> ? U : T
 
 export default class TravelController {
+  private static readonly usersAuthentifiers = new Map<string, TrainlineAuthentifier>()
 
   static get router () {
     const routerTravels = express.Router()
@@ -56,11 +57,21 @@ export default class TravelController {
       return res.status(400).send({ msg: 'Unable to find the booker.' })
     }
 
+    // We cache authentifiers to avoid making too many login requests
+    const authentifier = TravelController.usersAuthentifiers.get(booker.username!) ?? new TrainlineAuthentifier({ username: booker.username!, password: booker.password! })
+    TravelController.usersAuthentifiers.set(booker.username!, authentifier)
+    if (await authentifier.checkToken() === false) {
+      const loginResponse = await authentifier.login()
+      if (typeof loginResponse !== 'undefined') {
+        res.statusCode = 401
+        return res.json(loginResponse)
+      }
+    }
     const searcher = new TrainlineSearcher({
       from: String(req.query.from),
       to: String(req.query.to),
       date: new Date(String(req.query.date))
-    }, { username: booker.username!, password: booker.password! })
+    }, authentifier)
 
     res.setHeader('Content-Type', 'application/ndjson; charset=utf-8')
     const iterable = searcher.getTrips(typeof req.query.untilDate === 'string' ? new Date(req.query.untilDate) : undefined)

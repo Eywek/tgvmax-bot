@@ -89,7 +89,7 @@ type SearchTrainResponse = {
     cents: number // should be 0 if the train is free
     system: 'sncf' | 'flixbus' | 'busbud' | 'pao_sncf' | 'pao_ouigo' | string
   }[]
-  trips: {
+  trips?: {
     id: string
     digest: string
     segment_ids: string[]
@@ -245,7 +245,8 @@ type PNRsResponse = {
   }[]
 }
 
-type Trip = SearchTrainResponse['trips'][number] & { searchId: string }
+type Trip = NonNullable<SearchTrainResponse['trips']>[number]
+type SearchedTrip = Trip & { searchId: string }
 
 export class TrainlineAuthentifier {
   protected credentials: Credentials
@@ -278,8 +279,8 @@ export class TrainlineAuthentifier {
     })
   }
 
-  protected async login() {
-    this.logger('login')
+  public async login() {
+    this.logger(`Try to log-in for ${this.credentials.username}`)
     const res = await fetch(endpoint + '/account/signin', {
       method: 'POST',
       headers: {
@@ -293,12 +294,16 @@ export class TrainlineAuthentifier {
         password: this.credentials.password,
       } as LoginRequest)
     })
-    let token: LoginResponse = await res.json()
+    let token: LoginResponse | { url: string } = await res.json()
+    if (!('passengers' in token)) {
+      this.logger(`Unable to connect for user ${this.credentials.username}`)
+      return { captchaUrl: token.url }
+    }
     this.token = token
     this.token.passengers = token.passengers.filter(p => p.is_selected)
   }
 
-  protected async checkToken(): Promise<boolean> {
+  public async checkToken(): Promise<boolean> {
     if (!this.token) {
       return false
     }
@@ -464,8 +469,8 @@ export class TrainlineSearcher {
   protected departureId: string
   protected arrivalId: string
 
-  constructor(travel: TrainlineSearcher['travel'], credentials: Credentials) {
-    this.authentifier = new TrainlineAuthentifier(credentials)
+  constructor(travel: TrainlineSearcher['travel'], credentials: TrainlineAuthentifier | Credentials) {
+    this.authentifier = credentials instanceof TrainlineAuthentifier ? credentials : new TrainlineAuthentifier(credentials)
     this.travel = travel
     this.logger = debug(`searcher:trainline:${this.travel.from}-${this.travel.to}_${this.travel.date.toLocaleDateString('sv')}`)
     this.logger(`Init searcher`)
@@ -485,7 +490,7 @@ export class TrainlineSearcher {
   async destroy () {}
 
   public async list () {
-    const trips: (Trip)[] = []
+    const trips: SearchedTrip[] = []
     const iterator = this.getTrips()
     for await (const { trips: foundTrips } of iterator) {
       trips.push(...foundTrips)
@@ -499,7 +504,7 @@ export class TrainlineSearcher {
     return trips
   }
 
-  public formatTrip (trip: Trip) {
+  public formatTrip (trip: SearchedTrip) {
     return {
       from: trip.departure_station_id,
       fromFormatted: trainlineStations.find(s => s.trainlineId === trip.departure_station_id)!.name,
@@ -515,7 +520,7 @@ export class TrainlineSearcher {
     }
   }
 
-  private uniqueIdForTrip (trip: SearchTrainResponse['trips'][number]): string {
+  private uniqueIdForTrip (trip: Trip): string {
     // Note: trip.id isn't unique so we need to create our unique id
     return JSON.stringify({
       arrival_date: trip.arrival_date,
@@ -526,7 +531,7 @@ export class TrainlineSearcher {
     })
   }
 
-  public getTrips(maxDate: Date = new Date(this.travel.date)): AsyncIterable<{ trips: Trip[], lastDate: Date }> {
+  public getTrips(maxDate: Date = new Date(this.travel.date)): AsyncIterable<{ trips: SearchedTrip[], lastDate: Date }> {
     const minDate = new Date(this.travel.date)
     // i.e GMT+02 = offset will be -120, so for 11h we will set 9h UTC
     minDate.setUTCHours((this.travel.minHour ?? 0) + (getTimezoneOffset('Europe/Paris') / 60))
@@ -560,7 +565,7 @@ export class TrainlineSearcher {
                 done: true as true
               }
             }
-            const { trips: filteredTrips, lastDate: ld } = searcher.filterTrips(trips.trips, minDate, maxDate)
+            const { trips: filteredTrips, lastDate: ld } = searcher.filterTrips(trips.trips ?? [], minDate, maxDate)
             for (const trip of filteredTrips) {
               seenTrips.add(searcher.uniqueIdForTrip(trip))
             }
@@ -587,7 +592,7 @@ export class TrainlineSearcher {
       
           const result = await searcher.searchNext(Object.assign(trips.search, searchRequest, { currentDate: lastDate }))
           trips.search = result.search // in case of new search being launched
-          const { trips: nextTrips, lastDate: nextLastDate } = searcher.filterTrips(result.trips, minDate, maxDate)
+          const { trips: nextTrips, lastDate: nextLastDate } = searcher.filterTrips(result.trips ?? [], minDate, maxDate)
           // Ignore trips we've seen from previous pages
           const filteredTrips = nextTrips.filter(trip => seenTrips.has(searcher.uniqueIdForTrip(trip)) === false)
           for (const trip of filteredTrips) {
@@ -607,7 +612,7 @@ export class TrainlineSearcher {
     }
   }
 
-  private filterTrips(trips: SearchTrainResponse['trips'], minDate: Date, maxDate: Date): { trips: SearchTrainResponse['trips']; lastDate?: Date } {
+  private filterTrips(trips: Trip[], minDate: Date, maxDate: Date): { trips: Trip[], lastDate?: Date } {
     this.logger(`got ${trips.length} trips for the request`)
 
     trips = trips.sort((a, b) => a.departure_date.localeCompare(b.departure_date))
@@ -758,7 +763,7 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
     await this.notifier.send(this.formatMessageBooked(trip, confirmation))
   }
 
-  private formatMessageAvailable (trips: (Trip)[]): string {
+  private formatMessageAvailable (trips: SearchedTrip[]): string {
     let content = `Des billets TGVMax sont disponible pour le ${getDate(this.travel.date)}:`
     trips.forEach((trip) => {
       const formattedTrip = this.formatTrip(trip)
@@ -770,7 +775,7 @@ export default class TrainlineSearcherAndBooker extends TrainlineSearcher implem
     return content
   }
 
-  private formatMessageBooked(trip: SearchTrainResponse['trips'][0], confirm: ConfirmResponse): string {
+  private formatMessageBooked(trip: Trip, confirm: ConfirmResponse): string {
     let content = `Un billet a ete reserve pour le ${getHumanDate(new Date(trip.departure_date))} et une arrivee le ${getHumanDate(new Date(trip.arrival_date))}:`
     for (const segment of confirm.segments) {
       content += `\n- train ${segment.train_number || 'inconnu'} (voiture ${segment.car || 'inconnue'} siege ${segment.seat || 'inconnu'})`
